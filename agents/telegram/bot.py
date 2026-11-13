@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 
+from core.approval_manager import ApprovalManager
 from core.orchestrator import Orchestrator
 from models.llama import LlamaModel
 
@@ -82,6 +83,7 @@ class TelegramAgent:
         allowed_chat_id: str,
         llama: LlamaModel | None = None,
         orchestrator: Orchestrator | None = None,
+        approvals: ApprovalManager | None = None,
     ) -> None:
         if not allowed_chat_id or not allowed_chat_id.strip():
             raise ValueError("TELEGRAM_CHAT_ID must be configured")
@@ -89,6 +91,7 @@ class TelegramAgent:
         self.allowed_chat_id = str(allowed_chat_id)
         self.llama = llama or LlamaModel()
         self.orchestrator = orchestrator or Orchestrator()
+        self.approvals = approvals or ApprovalManager()
 
     def handle_update(self, update: dict[str, Any]) -> None:
         message = update.get("message") or {}
@@ -112,6 +115,10 @@ class TelegramAgent:
                 "Befehle:\n"
                 "/ask Deine Frage – fragt das lokale Llama-Modell\n"
                 "/status – zeigt registrierte Agenten\n"
+                "/request AKTION | DETAILS – Freigabe anfordern\n"
+                "/pending – offene Freigaben anzeigen\n"
+                "/approve ID – Freigabe erteilen\n"
+                "/deny ID – Freigabe ablehnen\n"
                 "/help – Hilfe anzeigen",
             )
         elif command == "/status":
@@ -123,6 +130,52 @@ class TelegramAgent:
                     f"• {agent['name']}: {agent['state']}" for agent in agents
                 )
             self._reply(chat_id, f"📊 NClaw-Status\n{status}")
+        elif command == "/request":
+            action, separator, description = argument.partition("|")
+            if not separator or not action.strip() or not description.strip():
+                self._reply(chat_id, "Format: /request AKTION | genaue Beschreibung")
+                return
+            try:
+                request = self.approvals.create(action, description)
+                self._reply(
+                    chat_id,
+                    f"Freigabe angelegt: {request.request_id}\n"
+                    f"Aktion: {request.action}\n"
+                    f"Details: {request.description}\n"
+                    "Status: wartet auf deine Entscheidung (10 Minuten). "
+                    "Die Anfrage führt selbst noch nichts aus.",
+                )
+            except ValueError as exc:
+                self._reply(chat_id, f"Anfrage ungültig: {exc}")
+        elif command == "/pending":
+            pending = self.approvals.pending()
+            if not pending:
+                self._reply(chat_id, "Keine offenen Freigaben.")
+            else:
+                lines = [
+                    f"• {r.request_id}: {r.action} – {r.description}"
+                    for r in pending
+                ]
+                self._reply(chat_id, "Offene Freigaben:\n" + "\n".join(lines))
+        elif command in {"/approve", "/deny"}:
+            request_id = argument.strip()
+            if not request_id or " " in request_id:
+                self._reply(chat_id, f"Format: {command} ID")
+                return
+            try:
+                request = (
+                    self.approvals.approve(request_id)
+                    if command == "/approve"
+                    else self.approvals.reject(request_id)
+                )
+                decision = "genehmigt" if command == "/approve" else "abgelehnt"
+                self._reply(
+                    chat_id,
+                    f"Anfrage {request.request_id} {decision}. "
+                    "Es wurde dadurch noch keine Aktion ausgeführt.",
+                )
+            except (KeyError, ValueError, TimeoutError) as exc:
+                self._reply(chat_id, f"Keine Änderung: {exc}")
         elif command == "/ask":
             if not argument.strip():
                 self._reply(chat_id, "Bitte nutze: /ask Deine Frage")
