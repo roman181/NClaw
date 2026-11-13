@@ -56,3 +56,35 @@ def test_list_returns_recent_records_and_marks_expired_requests():
     assert [record.request_id for record in records] == [second.request_id, first.request_id]
     assert records[0].status == "expired"
     assert records[1].status == "pending"
+
+
+
+def test_sqlite_approvals_and_payload_survive_manager_restart(tmp_path):
+    database = tmp_path / "approvals.sqlite3"
+    first = ApprovalManager(db_path=database)
+    request = first.create("agent.run:notes", "Create a note", binding="digest",
+                           payload={"title": "Persistent plan"})
+    first.approve(request.request_id)
+
+    restarted = ApprovalManager(db_path=database)
+    restored = restarted.get(request.request_id)
+    assert restored.status == "approved"
+    assert restarted.payload_for(request.request_id) == {"title": "Persistent plan"}
+    assert restarted.consume(request.request_id, "agent.run:notes", "digest").status == "consumed"
+    with pytest.raises(PermissionError):
+        first.consume(request.request_id, "agent.run:notes", "digest")
+
+
+def test_sqlite_execution_history_survives_manager_restart(tmp_path):
+    from types import SimpleNamespace
+
+    database = tmp_path / "approvals.sqlite3"
+    manager = ApprovalManager(db_path=database)
+    manager.save_execution(SimpleNamespace(
+        execution_id="exec-1", agent="notes", approval_id="approval-1",
+        status="completed", created_at=100.0, finished_at=101.0, error=None,
+    ))
+    restored = ApprovalManager(db_path=database)
+    records = restored.list_executions()
+    assert records[0]["execution_id"] == "exec-1"
+    assert records[0]["status"] == "completed"
