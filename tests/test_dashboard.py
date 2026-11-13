@@ -24,7 +24,7 @@ def test_dashboard_serves_ui_and_local_task_api(tmp_path: Path, monkeypatch):
             assert b"NClaw" in response.read()
 
         payload = json.dumps({"title": "Dashboard testen", "priority": 2}).encode()
-        request = Request(base + "/api/tasks", data=payload, headers={"Content-Type": "application/json"}, method="POST")
+        request = Request(base + "/api/tasks", data=payload, headers={"Content-Type": "application/json", "Origin": base}, method="POST")
         with urlopen(request, timeout=3) as response:
             created = json.loads(response.read())
             assert response.status == 201
@@ -394,3 +394,75 @@ def test_agent_models_api_route_returns_read_only_inventory(tmp_path: Path, monk
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+def test_dashboard_rejects_untrusted_host_headers(tmp_path: Path, monkeypatch):
+    store = TaskStore(tmp_path / "tasks.sqlite3")
+    monkeypatch.setattr(dashboard_server, "STORE", store)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        request = Request(base + "/api/status", headers={"Host": "attacker.example"})
+        try:
+            urlopen(request, timeout=3)
+            raise AssertionError("Untrusted Host header must be rejected")
+        except HTTPError as error:
+            assert error.code == 421
+
+        request = Request(
+            base + "/api/tasks",
+            data=json.dumps({"title": "Must not be created"}).encode(),
+            headers={"Host": "attacker.example", "Content-Type": "text/plain"},
+            method="POST",
+        )
+        try:
+            urlopen(request, timeout=3)
+            raise AssertionError("DNS-rebinding Host header must be rejected")
+        except HTTPError as error:
+            assert error.code == 421
+        assert store.list() == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
+
+
+def test_dashboard_rejects_cross_origin_simple_post(tmp_path: Path, monkeypatch):
+    store = TaskStore(tmp_path / "tasks.sqlite3")
+    monkeypatch.setattr(dashboard_server, "STORE", store)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        request = Request(
+            base + "/api/tasks",
+            data=json.dumps({"title": "Cross-site request"}).encode(),
+            headers={"Content-Type": "text/plain", "Origin": "http://attacker.example"},
+            method="POST",
+        )
+        try:
+            urlopen(request, timeout=3)
+            raise AssertionError("Cross-origin POST must be rejected")
+        except HTTPError as error:
+            assert error.code == 403
+        assert store.list() == []
+
+        request = Request(
+            base + "/api/tasks",
+            data=json.dumps({"title": "Fetch metadata request"}).encode(),
+            headers={"Content-Type": "text/plain", "Sec-Fetch-Site": "cross-site"},
+            method="POST",
+        )
+        try:
+            urlopen(request, timeout=3)
+            raise AssertionError("Cross-site Fetch Metadata must be rejected")
+        except HTTPError as error:
+            assert error.code == 403
+        assert store.list() == []
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
+
