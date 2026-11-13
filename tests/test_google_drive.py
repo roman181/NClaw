@@ -1,4 +1,6 @@
 """Google Drive adapter must only accept manually approved sandbox files."""
+from pathlib import Path
+
 import pytest
 
 from cloud.google_drive import GoogleDriveStorage
@@ -54,7 +56,8 @@ def test_restore_rejects_non_nclaw_file_before_download(tmp_path, monkeypatch):
     monkeypatch.setattr(drive, "_service", lambda: Service())
     with pytest.raises(ValueError, match="Backup-Ordner"):
         drive.restore_to_quarantine("abcde")
-    assert not list((tmp_path / "data").glob("quarantine/*")) if (tmp_path / "data" / "quarantine").exists() else True
+    quarantine = tmp_path / "data" / "quarantine"
+    assert not quarantine.exists() or not list(quarantine.iterdir())
 
 
 def test_restore_verifies_hash_and_writes_only_to_quarantine(tmp_path, monkeypatch):
