@@ -286,17 +286,18 @@ Es wird kein zweites KI-Modell und kein externer KI-Dienst automatisch aufgerufe
 
 🛡️ 8. TokenGuard
 
-TokenGuard überwacht die verfügbare Kontextkapazität des Llama-Modells.
+TokenGuard prüft vor jedem Nexus-Einzelaufruf die ungefähre Größe von Systemanweisung und Prompt.
 
-Geplanter Ablauf:
+Implementiert:
 
-- Kontextverbrauch überwachen.
-- Bei 90 % einen Handoff auslösen.
-- Projektstatus als JSON sichern.
-- Offene Aufgaben dokumentieren.
-- Einen JSON-Zwischenstand sichern.
-- Kontext für eine spätere Fortsetzung bereitstellen.
-- Arbeit nach Freigabe fortsetzen.
+- Konfigurierbares Kontextfenster über `NCLAW_CONTEXT_WINDOW` (Standard: 8192).
+- Auslöseschwelle über `NCLAW_TOKEN_THRESHOLD` (Standard: 0.90).
+- Konservative Token-Schätzung aus UTF-8-Bytes und Textelementen.
+- Bei Erreichen von 90 % wird der Llama-Aufruf gestoppt und ein JSON-Handoff lokal gespeichert.
+- Handoffs liegen privat unter `~/.nclaw/metadata/handoffs/` und enthalten Aufgabe, Modell, Zeitstempel und Token-Metriken.
+- Es findet kein Modellwechsel und kein automatischer Cloud-Upload statt.
+
+Wichtig: Die Tokenzahl ist eine Schätzung und nicht der exakte Tokenizer von Ollama. Ein Handoff wird derzeit manuell fortgesetzt; automatische Wiederaufnahme und mehrteilige Gesprächsverläufe sind noch nicht implementiert.
 
 Beispiel einer Übergabe
 
@@ -707,7 +708,7 @@ Phase 1 – Grundsystem
 Phase 2 – Agenten
 
 - [x] Telegram-Agent (sichere Basis: Allowlist, /ask, /status, /help)
-- [ ] Sandmann-Agent
+- [x] Sandmann-Agent (sichere Dateiannahme und Analyse)
 - [ ] Agentenverwaltung
 - [x] Telegram-Freigabe-Basis (Ablaufzeit, Einmalfreigabe, Aktionsbindung)
 - [x] Erste kontrollierte Aktion: neue Textdatei im Workspace nach separater Freigabe und Ausführungsbefehl
@@ -715,18 +716,20 @@ Phase 2 – Agenten
 
 Phase 3 – Bibliothek
 
-- [ ] Sandbox-Ai
-- [ ] ZIP-Analyse
-- [ ] PDF-Analyse
+- [x] Lokale Sandbox mit Quarantäne und Freigabeordner
+- [x] ZIP-Analyse ohne Entpacken
+- [x] PDF-Analyse (bis zu 100 Seiten)
 - [ ] GitHub-Import
 - [ ] Dateiverwaltung
 - [ ] Duplikaterkennung
+- [x] Google-Drive-Backup freigegebener Dateien
+- [x] SHA-256-geprüfte Drive-Wiederherstellung in Quarantäne
 
 Phase 4 – Intelligenz
 
 - [x] Llama-Einzelmodell (Basis)
-- [ ] TokenGuard
-- [ ] JSON-Handoff
+- [x] TokenGuard (konservative Schätzung, 90-%-Schutz)
+- [x] JSON-Handoff (lokal, manuelle Fortsetzung)
 - [ ] Skill-Registry
 - [ ] Skill-Versionierung
 
