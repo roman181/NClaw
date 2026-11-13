@@ -1064,3 +1064,30 @@ Die Seite **Aktivitäten → Audit & Aktivitäten** fasst die letzten 50 Freigab
 - Die Audit-Ansicht kann keine Freigaben erteilen, Aktionen ausführen oder Datensätze verändern.
 
 Der Umfang ist bewusst auf die letzten 50 Freigaben und 50 Ausführungen begrenzt. Es werden keine zusätzlichen personenbezogenen Inhalte oder Modell-Prompts gespeichert.
+
+
+---
+
+## Android-App (APK)
+
+NClaw kann als Android-App mit lokal eingebettetem Python-Dashboard gestartet werden. Die App startet den vorhandenen Python-HTTP-Server innerhalb des App-Prozesses und zeigt das Dashboard in einer lokalen WebView an. Aufgaben, Freigaben und Ausführungsprotokolle liegen im privaten App-Datenverzeichnis unter `files/.nclaw`; sie werden nicht in ein öffentliches Verzeichnis exportiert.
+
+### APK bauen und installieren (ohne PC)
+
+1. Öffne [GitHub Actions – Android APK](https://github.com/roman181/NClaw/actions/workflows/android-apk.yml).
+2. Wähle **Run workflow** oder warte, bis ein Push den Build startet.
+3. Öffne den erfolgreichen Lauf und lade unter **Artifacts** das Archiv `NClaw-Android-APK` herunter.
+4. Entpacke das Archiv auf Android und öffne `app-debug.apk`.
+5. Erlaube Android bei Bedarf einmalig die Installation aus dieser Quelle.
+
+Die Debug-APK ist nicht im Play Store veröffentlicht und nicht mit einem privaten Release-Schlüssel signiert. Ollama-Inferenz benötigt weiterhin einen separat erreichbaren Ollama-Dienst im privaten Netzwerk; das Llama-Modell wird nicht in die APK gepackt.
+
+### Datenschutz und Netzwerk
+
+- Das Dashboard bindet weiterhin ausschließlich an `127.0.0.1:8765`.
+- Die App-WebView ruft nur diesen lokalen Endpunkt auf.
+- Die Android-App benötigt Internet-Berechtigung, damit eine optionale private LAN-Ollama-Instanz erreichbar sein kann.
+- Es gibt keine Shell-Ausführung und keine automatische Agentenfreigabe.
+- App-Daten bleiben im privaten Android-Speicher und werden beim Deinstallieren von Android entfernt.
+
+Der Android-Build wird durch `.github/workflows/android-apk.yml` erzeugt. Der erfolgreiche Workflow-Artefakt-Upload ist Voraussetzung für einen echten APK-Download.
