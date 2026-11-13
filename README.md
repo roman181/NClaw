@@ -1044,3 +1044,20 @@ Im Bereich **Agenten** kann ein installiertes Ollama-Modell ausgewählt und mit 
 ### Tests und Statusgrenzen
 
 `tests/test_agent_dashboard.py` prüft den vollständigen Ablauf (Vorschlag, fehlende Freigabe, Freigabe, separate Ausführung, einmalige Nutzung), Ablehnung, Eingabe-Allowlist, getrennte Inferenz und die UI-Kontrollen. Inferenz wird nur durch expliziten Formularaufruf gestartet. Freigaben und Ausführungsverläufe sind persistent und lokal in `approvals.sqlite3` gespeichert. Die Datenbank wird mit restriktiven Dateirechten angelegt. Der Runtime-Handler muss nach einem Neustart weiterhin ausdrücklich registriert sein; es gibt keine automatische Wiederaufnahme oder Ausführung.
+
+
+---
+
+## 🧾 24. Audit-Ansicht für Freigaben und Agentenläufe
+
+Die Seite **Aktivitäten → Audit & Aktivitäten** fasst die letzten 50 Freigaben und 50 Agentenausführungen aus dem lokalen SQLite-Register zusammen.
+
+- Freigaben und Ausführungen werden chronologisch zusammengeführt.
+- Suche nach Agent, Aktion, ID, Beschreibung oder protokolliertem Fehler.
+- Statusfilter für wartende, freigegebene, abgelehnte, abgelaufene, verbrauchte, erfolgreiche und fehlgeschlagene Vorgänge.
+- Anzeige von Zeitstempel, Vorgangs-ID und bereinigter Fehlerbeschreibung.
+- Daten werden ausschließlich über die bestehenden schreibgeschützten API-Endpunkte gelesen.
+- Sämtliche dynamischen Inhalte werden vor der Anzeige HTML-escaped.
+- Die Audit-Ansicht kann keine Freigaben erteilen, Aktionen ausführen oder Datensätze verändern.
+
+Der Umfang ist bewusst auf die letzten 50 Freigaben und 50 Ausführungen begrenzt. Es werden keine zusätzlichen personenbezogenen Inhalte oder Modell-Prompts gespeichert.
