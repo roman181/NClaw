@@ -1,8 +1,8 @@
 🧠 NClaw – Autonomous AI Agent Framework
 
-"CI" (https://github.com/roma64281/nclaw/actions/workflows/ci.yml/badge.svg)
-"Security" (https://github.com/roma64281/nclaw/actions/workflows/security.yml/badge.svg)
-"Termux" (https://github.com/roma64281/nclaw/actions/workflows/termux.yml/badge.svg)
+"CI" (https://github.com/roman181/NClaw/actions/workflows/ci.yml/badge.svg)
+"Security" (https://github.com/roman181/NClaw/actions/workflows/security.yml/badge.svg)
+"Termux" (https://github.com/roman181/NClaw/actions/workflows/termux.yml/badge.svg)
 
 "Status" (https://img.shields.io/badge/status-Konzeptphase-orange)
 "Architecture" (https://img.shields.io/badge/architecture-modular-blue)
@@ -16,7 +16,7 @@ NClaw verbindet lokale KI-Modelle, autonome Agenten, Skills, eine lokale Wissens
 
 Die Steuerung erfolgt über eine zentrale Benutzeroberfläche und optional über Telegram.
 
-«Projektstatus: Konzeptphase. Die README beschreibt die geplante Architektur und Roadmap. Nicht alle Funktionen sind bereits implementiert.»
+«Projektstatus: Frühes Entwicklungsstadium. Der Nexus-Core, ein einfacher Orchestrator, ein Freigabeschutz und erste Tests sind implementiert. Weitere Funktionen befinden sich in Planung.»
 
 ---
 
@@ -401,7 +401,7 @@ Für den ersten Aufbau wird Ollama auf einem PC, Mini-PC oder Server betrieben. 
 
 🚀 11. Installation
 
-«Hinweis: Die Installation ist vorbereitet. Der vollständige Programmstart wird erst mit der Implementierung der Kernmodule möglich.»
+Der erste Nexus-Core ist implementiert. Weitere Agenten und Integrationen folgen schrittweise.
 
 1. Termux vorbereiten
 
@@ -410,8 +410,8 @@ pkg install -y python git
 
 2. Repository herunterladen
 
-git clone https://github.com/roma64281/nclaw.git
-cd nclaw
+git clone https://github.com/roman181/NClaw.git
+cd NClaw
 
 3. Lokale Modelle installieren
 
@@ -713,7 +713,7 @@ Bitte keine API-Schlüssel, Passwörter oder persönlichen Daten in Issues und P
 
 📜 18. Lizenz
 
-NClaw ist unter der Apache License 2.0 vorgesehen.
+NClaw ist unter der Apache License 2.0 lizenziert.
 
 Weitere Informationen stehen in der Datei "LICENSE".
 
