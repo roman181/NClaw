@@ -34,7 +34,7 @@ class SkillRegistry:
             raise ValueError("Skill-Datei fehlt oder ist unsicher")
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
-            raise ValueError("Ungültiges Skill-Format")
+            raise TypeError("Ungültiges Skill-Format")
         return payload
 
     @staticmethod
