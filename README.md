@@ -511,7 +511,8 @@ nclaw/
 │   ├── __init__.py
 │   ├── nexus.py
 │   ├── orchestrator.py
-│   └── approvals.py
+│   ├── approval_manager.py
+│   └── approved_actions.py
 │
 ├── agents/
 │   ├── nexus/
