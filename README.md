@@ -252,6 +252,8 @@ flowchart TD
 
 Jeder Skill erhält eine eindeutige ID und eine Versionshistorie.
 
+**Implementierte Basis:** `skills/registry.py` speichert Skill-Beschreibungen und Anweisungen als lokale JSON-Metadaten unter `~/.nclaw/library/skills/`. Neue Versionen beginnen immer mit `pending_approval`. Sie werden erst nach einem dokumentierten erfolgreichen Test und einer ausdrücklichen Freigabe als aktiv gelistet. Bereits vorhandene Versionen können nicht überschrieben werden. Skill-Anweisungen bleiben Text und werden nicht als Python- oder Shell-Code ausgeführt.
+
 Beispiel:
 
 {
@@ -730,8 +732,8 @@ Phase 4 – Intelligenz
 - [x] Llama-Einzelmodell (Basis)
 - [x] TokenGuard (konservative Schätzung, 90-%-Schutz)
 - [x] JSON-Handoff (lokal, manuelle Fortsetzung)
-- [ ] Skill-Registry
-- [ ] Skill-Versionierung
+- [x] Skill-Registry (lokale JSON-Metadaten)
+- [x] Skill-Versionierung (unveränderliche Versionsdateien)
 
 Phase 5 – Evolution
 
