@@ -30,6 +30,23 @@ def test_dashboard_serves_ui_and_local_task_api(tmp_path: Path, monkeypatch):
             assert response.status == 201
             assert created["task"]["title"] == "Dashboard testen"
 
+        with urlopen(base + "/manifest.webmanifest", timeout=3) as response:
+            manifest = json.loads(response.read())
+            assert response.status == 200
+            assert response.headers["Content-Type"].startswith("application/manifest+json")
+            assert manifest["display"] == "standalone"
+            assert manifest["start_url"] == "/"
+
+        with urlopen(base + "/sw.js", timeout=3) as response:
+            service_worker = response.read().decode("utf-8")
+            assert response.status == 200
+            assert "addAll" in service_worker
+            assert "/api/" in service_worker
+
+        with urlopen(base + "/icon.svg", timeout=3) as response:
+            assert response.status == 200
+            assert response.headers["Content-Type"].startswith("image/svg+xml")
+
         with urlopen(base + "/api/status", timeout=3) as response:
             status = json.loads(response.read())
             assert status["counts"]["queued"] == 1
