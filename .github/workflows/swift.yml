@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-
+    if: ${{ hashFiles('**/Package.swift') != '' }}
     runs-on: macos-latest
 
     steps:
