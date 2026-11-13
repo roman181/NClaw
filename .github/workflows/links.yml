@@ -19,7 +19,14 @@ jobs:
             --no-progress
             --exclude '^http://127[.]0[.]0[.]1:11434/?$'
             --exclude '^http://192[.]168[.]1[.]50:11434/?$'
-            --exclude '^https://theresanaiforthat[.]com/?$'
+            --exclude '^https://theresanaiforthat[.]com/?            README.md SECURITY.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            --exclude '^https://www[.]onlinegdb[.]com/?            README.md SECURITY.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
             README.md SECURITY.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
