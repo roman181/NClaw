@@ -1,0 +1,22 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package source
+        run: |
+          mkdir -p dist
+          git archive --format=zip --output=dist/NClaw-source.zip HEAD
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/NClaw-source.zip
