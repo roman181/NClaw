@@ -285,3 +285,27 @@ def test_backup_history_lists_only_recent_backup_files(tmp_path: Path, monkeypat
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+def test_command_center_exposes_only_read_only_diagnostics_controls(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(dashboard_server, "STORE", TaskStore(tmp_path / "tasks.sqlite3"))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        with urlopen(f"http://127.0.0.1:{server.server_port}/", timeout=3) as response:
+            page = response.read().decode("utf-8")
+            assert 'id="diag-platform"' in page
+            assert 'id="diag-agent"' in page
+            assert 'data-command="diagnostics-refresh"' in page
+            assert "keine Befehlsausführung" in page
+        with urlopen(f"http://127.0.0.1:{server.server_port}/app.js", timeout=3) as response:
+            script = response.read().decode("utf-8")
+            assert "async function refreshDiagnostics()" in script
+            assert 'api("/api/system")' in script
+            assert 'api("/api/agent-status")' in script
+            assert 'data-command="execute"' not in script
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
