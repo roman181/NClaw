@@ -1,7 +1,8 @@
 """Local-only HTTP server for the NClaw dashboard.
 
-Only serves this dashboard and exposes a small allowlist of task APIs.
-It intentionally has no shell, file-management, agent-execution or internet API.
+Serves the dashboard and a strict local API allowlist. Agent actions require
+explicit one-time approval; inference is a separate explicit local Ollama call.
+There is no shell, dynamic code, or arbitrary file-management API.
 """
 from __future__ import annotations
 
