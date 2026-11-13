@@ -32,8 +32,7 @@ class ApprovalManager:
         self, action: str, description: str, binding: str | None = None
     ) -> ApprovalRecord:
         action = action.strip()
-        description = description.strip()
-        if not action or not description:
+        if not action or not description.strip():
             raise ValueError("Action and description are required")
         if binding is not None and (not isinstance(binding, str) or not binding):
             raise ValueError("Binding must be a non-empty string")
