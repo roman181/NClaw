@@ -99,6 +99,9 @@ class AgentRuntime:
         if handler is None:
             raise KeyError("Agent is not registered")
         if payload is None:
+            approval_state = self.approvals.get(approval_id)
+            if approval_state.status != "approved":
+                raise PermissionError("Request has not been approved or was already consumed")
             payload = self.payload_for(approval_id)
         safe_payload, digest = self._serialize_payload(payload)
         approval = self.approvals.consume(
