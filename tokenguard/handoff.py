@@ -32,7 +32,7 @@ class HandoffStore:
         payload = {
             "schema_version": 1,
             "handoff_id": handoff_id,
-            "created_at": datetime.now(timezone.utc).isoformat(),  # noqa: UP017 - keep Python 3.10 compatibility
+            "created_at": datetime.now(timezone.utc).isoformat(),  # noqa: UP017
             "project": "NClaw",
             "model": model,
             "goal": goal,
