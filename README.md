@@ -961,3 +961,8 @@ dashboard/
     ├── style.css
     └── app.js
 ```
+
+
+### Live-Systemmonitor
+
+Die Startseite zeigt zusätzlich schreibgeschützte Host-Metriken: RAM-Auslastung (wenn `/proc/meminfo` verfügbar ist), freien Speicherplatz des Home-Dateisystems, Load Average und Systemlaufzeit (wenn `/proc/uptime` verfügbar ist). Die Anzeige aktualisiert sich alle 10 Sekunden über `GET /api/system`. Es werden keine Prozesse beendet, keine Einstellungen verändert und keine externen Dienste kontaktiert.
