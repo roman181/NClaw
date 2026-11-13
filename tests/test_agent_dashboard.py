@@ -15,7 +15,9 @@ from tasks.store import TaskStore
 def _start_dashboard(monkeypatch, tmp_path):
     store = TaskStore(tmp_path / "tasks.sqlite3")
     monkeypatch.setattr(dashboard_server, "STORE", store)
-    monkeypatch.setattr(dashboard_server, "RUNTIME", AgentRuntime())
+    runtime = AgentRuntime()
+    runtime.register("task-assistant", dashboard_server._create_task_action)
+    monkeypatch.setattr(dashboard_server, "RUNTIME", runtime)
     server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
     worker = Thread(target=server.serve_forever, daemon=True)
     worker.start()
