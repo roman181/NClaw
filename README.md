@@ -16,7 +16,7 @@ NClaw verbindet lokale KI-Modelle, autonome Agenten, Skills, eine lokale Wissens
 
 Die Steuerung erfolgt über eine zentrale Benutzeroberfläche und optional über Telegram.
 
-«Projektstatus: Frühes Entwicklungsstadium. Der Nexus-Core, ein einfacher Orchestrator, ein Freigabeschutz und erste Tests sind implementiert. Weitere Funktionen befinden sich in Planung.»
+«Projektstatus: Frühes Entwicklungsstadium. Nexus-Core, Telegram-Freigaben, eine lokale Sandmann-Sandbox und ein optionaler Google-Drive-Adapter sind implementiert. Die Drive-Anmeldung und Synchronisierung benötigen noch die Einrichtung eigener Google-OAuth-Zugangsdaten.»
 
 ---
 
@@ -178,23 +178,25 @@ Die Sandbox ist der Eingang für neue Informationen.
 
 Geplant:
 
-- Beliebige Dateien importieren.
-- ZIP-Archive analysieren.
-- PDFs auslesen.
-- Quellcode untersuchen.
-- GitHub-Links importieren.
-- Duplikate erkennen.
-- Inhalte kategorisieren.
-- Neue Skills identifizieren.
+- Dateien lokal auf dem Android-Gerät oder Linux-System aufnehmen.
+- ZIP-Archive sicher auflisten (kein automatisches Entpacken).
+- PDFs auslesen (pypdf).
+- Text- und Quellcodedateien als Daten untersuchen, niemals ausführen.
+- Unbekannte Dateitypen in quarantine ablegen.
+- Importgrößen, ZIP-Einträge und entpackte Größen begrenzen.
+- Dateien nach manueller Prüfung in approved verschieben.
+- Google Drive als optionales Backup-Ziel für freigegebene Dateien verwenden.
 
 Verzeichnis:
 
-Sandbox-Ai/
+~/.nclaw/ (lokaler Gerätespeicher; per NCLAW_DATA_DIR änderbar)
 ├── incoming/
 ├── processing/
 ├── approved/
 ├── rejected/
-└── quarantine/
+├── quarantine/
+├── library/
+└── metadata/
 
 Unbekannter Code wird niemals ungeprüft ausgeführt.
 
@@ -449,6 +451,9 @@ MODEL_NAME=llama3.2
 NCLAW_ENV=development
 NCLAW_LOG_LEVEL=INFO
 NCLAW_WORKSPACE=workspace
+NCLAW_DATA_DIR=~/.nclaw
+GOOGLE_DRIVE_CREDENTIALS=~/.nclaw/google-oauth-client.json
+GOOGLE_DRIVE_TOKEN=~/.nclaw/google-drive-token.json
 
 Wenn Ollama auf einem anderen Rechner läuft:
 
@@ -483,6 +488,63 @@ Der Bot akzeptiert ausschließlich Nachrichten von der konfigurierten Chat-ID un
 
 Für den Betrieb muss der Rechner mit Ollama erreichbar sein. Beende den Polling-Prozess mit Ctrl+C.
 
+### Lokale Gerätesandbox und Sandmann
+
+Der Standardspeicher liegt unter `~/.nclaw/` im privaten Termux-App-Speicher. Er ist nicht öffentlich über andere Android-Apps sichtbar. Die Sandbox wird automatisch mit den Ordnern `incoming`, `processing`, `approved`, `rejected`, `quarantine`, `library` und `metadata` angelegt.
+
+Für Zugriff auf Downloads und andere Android-Dateien:
+
+```bash
+termux-setup-storage
+```
+
+Danach kann in der lokalen `.env` z. B. folgender Speicherort gesetzt werden:
+
+```env
+NCLAW_DATA_DIR=~/storage/shared/Documents/NClaw
+```
+
+Sandmann-Befehle:
+
+```bash
+# Datei sicher in incoming oder quarantine kopieren
+python -m agents.sandmann import ~/storage/shared/Download/datei.zip
+
+# Importierte Datei analysieren (Pfad aus der Import-Ausgabe verwenden)
+python -m agents.sandmann inspect ~/.nclaw/incoming/DATEI
+
+# Nach eigener Prüfung bewusst in approved verschieben
+python -m agents.sandmann approve ~/.nclaw/incoming/DATEI
+```
+
+ZIP-Dateien werden nur auf Einträge und Sicherheitsmerkmale geprüft, nicht entpackt. Unbekannte Formate werden quarantänisiert. Quellcode wird als Text betrachtet und nicht ausgeführt.
+
+### Google Drive als optionaler Cloud-Speicher
+
+Die Google-Drive-Anbindung verwendet NClaws eigene OAuth-Anmeldung. Sie ist unabhängig von einer ChatGPT-Drive-Verbindung. Nur Dateien aus `approved/` können hochgeladen werden; es gibt keine automatische Synchronisierung und keinen Upload von `incoming/` oder `quarantine/`.
+
+1. In der [Google Cloud Console](https://console.cloud.google.com/) ein Projekt auswählen oder erstellen.
+2. Die **Google Drive API** aktivieren.
+3. Einen OAuth-Client vom Typ **Desktop-App** erstellen und die heruntergeladene JSON-Datei lokal ablegen:
+   `~/.nclaw/google-oauth-client.json`
+4. Bei einer OAuth-Test-App das eigene Google-Konto als Testnutzer eintragen.
+5. Diese lokalen Einstellungen in `.env` setzen:
+
+```env
+GOOGLE_DRIVE_CREDENTIALS=~/.nclaw/google-oauth-client.json
+GOOGLE_DRIVE_TOKEN=~/.nclaw/google-drive-token.json
+```
+
+6. Eine zuvor geprüfte Datei nach `approved/` verschieben und den Upload ausdrücklich starten:
+
+```bash
+python -m cloud.google_drive --file ~/.nclaw/approved/DATEI
+```
+
+Beim ersten Start zeigt NClaw eine Google-Anmeldeseite an. Den Link im Android-Browser öffnen und den Zugriff bestätigen. Der OAuth-Token bleibt lokal und wird mit restriktiven Dateirechten gespeichert. Der angeforderte Scope ist `drive.file`; NClaw erhält damit keinen pauschalen Zugriff auf dein gesamtes Drive.
+
+**Wichtig:** OAuth-Clientdatei und Token niemals in GitHub hochladen oder in Chats teilen. Für die Cloud wird nur der ausdrücklich angegebene und zuvor freigegebene Inhalt übertragen.
+
 ---
 
 📁 13. Projektstruktur
@@ -504,9 +566,21 @@ nclaw/
 │   └── dependabot.yml
 │
 ├── agents/
-│   └── telegram/
+│   ├── telegram/
+│   │   ├── __init__.py
+│   │   └── bot.py
+│   └── sandmann/
 │       ├── __init__.py
-│       └── bot.py
+│       ├── __main__.py
+│       └── agent.py
+│
+├── sandbox/
+│   ├── __init__.py
+│   └── storage.py
+│
+├── cloud/
+│   ├── __init__.py
+│   └── google_drive.py
 │
 ├── core/
 │   ├── __init__.py
@@ -562,7 +636,9 @@ nclaw/
 │
 ├── tests/
 │   ├── test_core.py
-│   └── test_telegram.py
+│   ├── test_telegram.py
+│   ├── test_sandmann.py
+│   └── test_google_drive.py
 │
 ├── .env.example
 ├── .gitignore
