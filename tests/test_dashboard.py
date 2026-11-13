@@ -1,0 +1,62 @@
+"""Integration tests for the loopback dashboard API."""
+from __future__ import annotations
+
+import json
+from http.server import ThreadingHTTPServer
+from pathlib import Path
+from threading import Thread
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+import dashboard.server as dashboard_server
+from tasks.store import TaskStore
+
+
+def test_dashboard_serves_ui_and_local_task_api(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(dashboard_server, "STORE", TaskStore(tmp_path / "tasks.sqlite3"))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    base = f"http://127.0.0.1:{server.server_port}"
+    try:
+        with urlopen(base + "/", timeout=3) as response:
+            assert response.status == 200
+            assert b"NClaw" in response.read()
+
+        payload = json.dumps({"title": "Dashboard testen", "priority": 2}).encode()
+        request = Request(base + "/api/tasks", data=payload, headers={"Content-Type": "application/json"}, method="POST")
+        with urlopen(request, timeout=3) as response:
+            created = json.loads(response.read())
+            assert response.status == 201
+            assert created["task"]["title"] == "Dashboard testen"
+
+        with urlopen(base + "/api/status", timeout=3) as response:
+            status = json.loads(response.read())
+            assert status["counts"]["queued"] == 1
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
+
+
+def test_dashboard_does_not_expose_arbitrary_command_route(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(dashboard_server, "STORE", TaskStore(tmp_path / "tasks.sqlite3"))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/api/execute",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urlopen(request, timeout=3)
+            raise AssertionError("Arbitrary command route must not exist")
+        except HTTPError as error:
+            assert error.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
