@@ -5,6 +5,7 @@ from core.approved_actions import ApprovedFileWriter
 
 
 def test_creates_new_file_inside_workspace(tmp_path) -> None:
+    (tmp_path / "notes").mkdir()
     writer = ApprovedFileWriter(tmp_path)
     path = writer.create_new("notes/hello.txt", "Hallo NClaw")
     assert path.read_text(encoding="utf-8") == "Hallo NClaw"
