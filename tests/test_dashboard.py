@@ -372,3 +372,25 @@ def test_backup_history_returns_json_serializable_timestamp(tmp_path: Path, monk
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+def test_agent_models_api_route_returns_read_only_inventory(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(dashboard_server, "STORE", TaskStore(tmp_path / "tasks.sqlite3"))
+    monkeypatch.setattr(dashboard_server, "ollama_models", lambda: {
+        "ok": True,
+        "available": True,
+        "endpoint": "127.0.0.1:11434",
+        "models": [{"name": "llama3:latest", "size": 1024, "modified_at": None}],
+    })
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        with urlopen(f"http://127.0.0.1:{server.server_port}/api/agent-models", timeout=3) as response:
+            payload = json.loads(response.read())
+            assert response.status == 200
+            assert payload["models"][0]["name"] == "llama3:latest"
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
