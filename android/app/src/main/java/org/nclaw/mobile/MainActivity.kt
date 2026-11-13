@@ -48,10 +48,9 @@ class MainActivity : Activity() {
             try {
                 if (!Python.isStarted()) Python.start(AndroidPlatform(this))
                 val py = Python.getInstance()
-                py.getModule("os").get("environ")?.asMap()
-                py.getModule("os").callAttr("environ", "get", "HOME")
-                py.getModule("os").callAttr("makedirs", filesDir.absolutePath + "/.nclaw", "exist_ok")
-                py.getModule("os").get("environ").set("NCLAW_DATA_DIR", filesDir.absolutePath + "/.nclaw")
+                val dataDir = filesDir.absolutePath + "/.nclaw"
+                py.getModule("os").callAttr("makedirs", dataDir, "exist_ok")
+                py.getModule("os").get("environ").callAttr("update", mapOf("NCLAW_DATA_DIR" to dataDir))
                 py.getModule("dashboard.server").callAttr("main")
             } catch (error: Throwable) {
                 runOnUiThread { status.text = "NClaw-Backend konnte nicht starten: ${error.message}" }
