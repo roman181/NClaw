@@ -85,3 +85,31 @@ def test_system_metrics_shape():
     assert isinstance(metrics["platform"], str)
     assert 0 <= metrics["disk"]["used_percent"] <= 100
     assert metrics["memory"] is None or 0 <= metrics["memory"]["used_percent"] <= 100
+
+
+
+def test_agent_status_endpoint_reports_local_service_state(monkeypatch):
+    monkeypatch.setattr(
+        dashboard_server,
+        "ollama_status",
+        lambda: {
+            "ok": True,
+            "available": False,
+            "version": None,
+            "endpoint": "127.0.0.1:11434",
+        },
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        with urlopen(f"http://127.0.0.1:{server.server_port}/api/agent-status", timeout=3) as response:
+            status = json.loads(response.read())
+            assert response.status == 200
+            assert status["ok"] is True
+            assert status["available"] is False
+            assert status["endpoint"] == "127.0.0.1:11434"
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
