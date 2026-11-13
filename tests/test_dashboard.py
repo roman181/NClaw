@@ -113,3 +113,42 @@ def test_agent_status_endpoint_reports_local_service_state(monkeypatch):
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+
+def test_ollama_status_uses_explicit_private_lan_host(monkeypatch):
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def read(self, size):
+            assert size == 4096
+            return b'{"version": "0.6.2"}'
+
+    class Opener:
+        def open(self, request, timeout):
+            assert request.full_url == "http://192.168.1.50:11434/api/version"
+            assert timeout == 0.8
+            return Response()
+
+    monkeypatch.setenv("OLLAMA_HOST", "http://192.168.1.50:11434")
+    monkeypatch.setattr(dashboard_server, "build_opener", lambda *handlers: Opener())
+    status = dashboard_server.ollama_status()
+    assert status == {
+        "ok": True,
+        "available": True,
+        "version": "0.6.2",
+        "endpoint": "192.168.1.50:11434",
+    }
+
+
+def test_ollama_status_rejects_public_hosts(monkeypatch):
+    monkeypatch.setenv("OLLAMA_HOST", "https://example.com:11434")
+    status = dashboard_server.ollama_status()
+    assert status["ok"] is True
+    assert status["available"] is False
+    assert status["version"] is None
+    assert status["endpoint"] == "Ungültige OLLAMA_HOST-Konfiguration"
