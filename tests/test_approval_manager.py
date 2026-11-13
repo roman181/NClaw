@@ -45,3 +45,14 @@ def test_expired_request_cannot_be_approved() -> None:
     request.expires_at = 0
     with pytest.raises(TimeoutError):
         manager.approve(request.request_id)
+
+
+def test_list_returns_recent_records_and_marks_expired_requests():
+    manager = ApprovalManager(ttl_seconds=1)
+    first = manager.create("task.create", "Create a task")
+    second = manager.create("task.create", "Create another task")
+    second.expires_at = 0
+    records = manager.list()
+    assert [record.request_id for record in records] == [second.request_id, first.request_id]
+    assert records[0].status == "expired"
+    assert records[1].status == "pending"
