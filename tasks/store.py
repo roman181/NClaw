@@ -5,7 +5,6 @@ shell commands, network requests, or external side effects.
 """
 from __future__ import annotations
 
-import json
 import os
 import sqlite3
 import uuid
@@ -34,7 +33,10 @@ class TaskStore:
 
     def __init__(self, path: str | Path | None = None) -> None:
         configured = path or Path(os.getenv("NCLAW_DATA_DIR", "~/.nclaw")).expanduser() / "tasks.sqlite3"
-        self.path = Path(configured).expanduser().resolve()
+        raw_path = Path(configured).expanduser()
+        if raw_path.is_symlink():
+            raise ValueError("Task database must not be a symbolic link")
+        self.path = raw_path.resolve()
         self.path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         try:
             self.path.parent.chmod(0o700)
