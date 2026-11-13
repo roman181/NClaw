@@ -51,7 +51,7 @@ class HandoffStore:
             descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
                 json.dump(payload, stream, ensure_ascii=False, indent=2)
-                stream.write("\\n")
+                stream.write("\n")
             temporary.replace(target)
         finally:
             if temporary.exists():
