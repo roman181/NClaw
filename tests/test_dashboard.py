@@ -230,3 +230,32 @@ def test_ollama_status_does_not_follow_redirects(monkeypatch):
     assert isinstance(handlers[0], dashboard_server._NoRedirect)
     assert handlers[0].redirect_request(None, None, 302, "Found", {}, "https://example.com/api/version") is None
 
+
+
+
+def test_local_backup_command_creates_verified_backup(tmp_path: Path, monkeypatch):
+    store = TaskStore(tmp_path / "private" / "tasks.sqlite3")
+    task = store.create("Backup from command center")
+    monkeypatch.setattr(dashboard_server, "STORE", store)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        request = Request(
+            f"http://127.0.0.1:{server.server_port}/api/backup",
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urlopen(request, timeout=3) as response:
+            result = json.loads(response.read())
+            assert response.status == 201
+            assert result["ok"] is True
+            assert result["filename"].startswith("tasks-")
+            backup = store.path.parent / "backups" / result["filename"]
+            copied = TaskStore(backup)
+            assert copied.get(str(task["id"]))["title"] == "Backup from command center"
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
