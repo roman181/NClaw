@@ -259,3 +259,29 @@ def test_local_backup_command_creates_verified_backup(tmp_path: Path, monkeypatc
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+def test_backup_history_lists_only_recent_backup_files(tmp_path: Path, monkeypatch):
+    store = TaskStore(tmp_path / "private" / "tasks.sqlite3")
+    backup_dir = store.path.parent / "backups"
+    backup_dir.mkdir()
+    valid_backup = store.backup(backup_dir / "tasks-20261113T100000000000Z.sqlite3")
+    (backup_dir / "notes.txt").write_text("not a backup", encoding="utf-8")
+    (backup_dir / "tasks-invalid.sqlite3-link").write_text("not a sqlite backup", encoding="utf-8")
+    (backup_dir / "tasks-symlink.sqlite3").symlink_to(valid_backup)
+
+    monkeypatch.setattr(dashboard_server, "STORE", store)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        with urlopen(f"http://127.0.0.1:{server.server_port}/api/backups", timeout=3) as response:
+            payload = json.loads(response.read())
+            assert response.status == 200
+            assert [item["filename"] for item in payload["backups"]] == [valid_backup.name]
+            assert payload["backups"][0]["size"] > 0
+            assert payload["backups"][0]["modified_at"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
