@@ -177,7 +177,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
                         backups.append({
                             "filename": item.name,
                             "size": info.st_size,
-                            "modified_at": datetime.fromtimestamp(info.st_mtime, UTC).isoformat(),
+                            "modified_at": datetime.fromtimestamp(info.st_mtime, timezone.utc)  # noqa: UP017 - keep Python 3.10 compatibility.isoformat(),
                         })
             backups.sort(key=lambda item: item["modified_at"], reverse=True)
             self._json(200, {"backups": backups[:20]})
