@@ -181,3 +181,26 @@ def test_dashboard_page_exposes_distinct_approval_and_inference_controls(tmp_pat
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+def test_dashboard_audit_screen_has_search_status_filters_and_safe_rendering(tmp_path, monkeypatch):
+    _store, server, worker, base = _start_dashboard(monkeypatch, tmp_path)
+    try:
+        with urlopen(base + "/", timeout=3) as response:
+            page = response.read().decode()
+            assert 'id="page-activity"' in page
+            assert 'id="audit-search"' in page
+            assert 'id="audit-status"' in page
+            assert 'id="audit-list"' in page
+            assert 'data-command="audit-refresh"' in page
+        with urlopen(base + "/app.js", timeout=3) as response:
+            script = response.read().decode()
+            assert 'api("/api/approvals")' in script
+            assert 'api("/api/agent-executions")' in script
+            assert 'addEventListener("input",renderAudit)' in script
+            assert 'function renderAudit()' in script
+            assert 'esc(item.error)' in script
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
