@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import json
 import os
+import platform
+import shutil
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -18,6 +20,33 @@ PORT = int(os.getenv("NCLAW_DASHBOARD_PORT", "8765"))
 WEB_ROOT = Path(__file__).resolve().parent / "static"
 STORE = TaskStore()
 
+
+def system_metrics() -> dict[str, object]:
+    """Return best-effort, read-only host metrics without optional dependencies."""
+    memory = None
+    meminfo = Path("/proc/meminfo")
+    if meminfo.is_file():
+        values = {}
+        for line in meminfo.read_text(encoding="ascii", errors="ignore").splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0].rstrip(":") in {"MemTotal", "MemAvailable"}:
+                values[parts[0].rstrip(":")] = int(parts[1]) * 1024
+        total, available = values.get("MemTotal"), values.get("MemAvailable")
+        if total and available is not None:
+            memory = {"total_bytes": total, "available_bytes": available, "used_percent": round((total - available) / total * 100, 1)}
+    disk = shutil.disk_usage(Path.home())
+    try:
+        load = list(os.getloadavg())
+    except (AttributeError, OSError):
+        load = None
+    uptime = None
+    uptime_file = Path("/proc/uptime")
+    if uptime_file.is_file():
+        try:
+            uptime = int(float(uptime_file.read_text(encoding="ascii").split()[0]))
+        except (ValueError, OSError, IndexError):
+            pass
+    return {"ok": True, "platform": platform.system() or "Unknown", "release": platform.release(), "python": platform.python_version(), "memory": memory, "disk": {"total_bytes": disk.total, "free_bytes": disk.free, "used_percent": round((disk.total - disk.free) / disk.total * 100, 1) if disk.total else 0}, "load_average": load, "uptime_seconds": uptime}
 
 class DashboardHandler(BaseHTTPRequestHandler):
     server_version = "NClawDashboard/1.0"
@@ -56,6 +85,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
                 "tasks": tasks,
                 "counts": {status: sum(task["status"] == status for task in tasks) for status in STATUSES},
             })
+            return
+        if path == "/api/system":
+            self._json(200, system_metrics())
             return
         if path == "/api/tasks":
             self._json(200, {"tasks": STORE.list(limit=200)})
