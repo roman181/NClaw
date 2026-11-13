@@ -1,0 +1,1 @@
+"""Optional cloud storage adapters."""
