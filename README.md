@@ -833,3 +833,75 @@ Weitere Informationen stehen in der Datei "LICENSE".
 One Core. Multiple Agents. Unlimited Possibilities.
 
 Local-first. Autonomous. Secure. Evolvable.# NClaw
+
+
+---
+
+## 🗂️ 19. Persistente Aufgabenverwaltung
+
+NClaw besitzt jetzt ein lokales Aufgabenregister auf SQLite-Basis. Es speichert Aufgaben und Statusänderungen dauerhaft auf dem Gerät – ohne Cloud-Synchronisierung und ohne automatische Ausführung.
+
+### Funktionen
+
+- Aufgaben mit Titel, Beschreibung, Priorität und optionalem Fälligkeitsdatum anlegen.
+- Aufgaben nach Status filtern und priorisiert anzeigen.
+- Statuswechsel mit festgelegten Übergangsregeln.
+- Ereignisverlauf je Aufgabe mit Zeitstempel und Notiz.
+- Persistente Speicherung in `~/.nclaw/tasks.sqlite3` (alternativ unter `NCLAW_DATA_DIR`).
+- Datenbankdatei mit restriktiven Dateirechten; keine Shell- oder Netzwerk-Ausführung.
+
+### Statusmodell
+
+| Status | Bedeutung |
+|---|---|
+| `queued` | Neu angelegt und wartet |
+| `in_progress` | In Bearbeitung |
+| `blocked` | Wartet auf eine Voraussetzung |
+| `completed` | Erfolgreich abgeschlossen |
+| `failed` | Fehlgeschlagen; kann erneut eingeplant werden |
+| `cancelled` | Abgebrochen |
+
+Abgeschlossene und abgebrochene Aufgaben sind Endzustände. Ungültige Statuswechsel werden abgewiesen.
+
+### Verwendung in Termux oder Linux
+
+```bash
+# Aufgabe anlegen (Priorität 1 = höchste, 5 = niedrigste)
+python -m tasks add "Nexus Dashboard bauen" --priority 1 \
+  --description "Read-only Statusübersicht vorbereiten"
+
+# Aufgaben anzeigen
+python -m tasks list
+python -m tasks list --status queued
+
+# Aufgabe anzeigen und Verlauf prüfen
+python -m tasks show TASK_ID
+
+# Status kontrolliert ändern
+python -m tasks move TASK_ID in_progress --note "Arbeit begonnen"
+python -m tasks move TASK_ID completed --note "Tests erfolgreich"
+```
+
+Die Aufgabenverwaltung ist zunächst ein Planungs- und Nachverfolgungssystem. Sie startet keine Agenten, führt keine Befehle aus und veröffentlicht keine Änderungen. Solche Aktionen bleiben separat freigabepflichtig.
+
+### Neue Dateien
+
+```text
+tasks/
+├── __init__.py
+├── __main__.py
+└── store.py
+
+tests/
+└── test_tasks.py
+```
+
+### Roadmap-Erweiterung
+
+- [x] Persistentes lokales Aufgabenregister
+- [x] Prioritäten und Statusfilter
+- [x] Ereignisverlauf und kontrollierte Statuswechsel
+- [x] Android-/Termux-freundliche CLI
+- [ ] Nexus-Aufgabenplanung mit expliziter Nutzerfreigabe
+- [ ] Dashboard für Aufgaben und Agentenstatus
+- [ ] Zeitgesteuerte Ausführung ausschließlich nach konfigurierter Freigabe
