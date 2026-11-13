@@ -23,8 +23,11 @@ class SandmannAgent:
         return self.storage.import_file(source)
 
     def inspect(self, stored_path: str | Path) -> dict[str, object]:
-        path = Path(stored_path).resolve(strict=True)
-        if not path.is_relative_to(self.storage.root) or not path.is_file() or path.is_symlink():
+        candidate = Path(stored_path)
+        if candidate.is_symlink():
+            raise ValueError("Symbolic links are not accepted")
+        path = candidate.resolve(strict=True)
+        if not path.is_relative_to(self.storage.root) or not path.is_file():
             raise ValueError("File must be inside the local sandbox")
         suffix = path.suffix.lower()
         result: dict[str, object] = {"name": path.name, "size": path.stat().st_size, "sha256": self._hash(path)}
