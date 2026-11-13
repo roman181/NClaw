@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "nclaw-shell-v4";
+const CACHE_NAME = "nclaw-shell-v5";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -34,26 +34,18 @@ self.addEventListener("fetch", event => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-  // Never cache task, status, system or other API responses.
+  // Never cache API responses or arbitrary same-origin URLs.
   if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
-
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(() => caches.match("/index.html"))
     );
     return;
   }
+  if (!APP_SHELL.includes(url.pathname)) return;
 
+  // The app shell is precached during install: use it first for reliable offline UI.
   event.respondWith(
-    caches.match(request).then(cached => {
-      if (cached) return cached;
-      return fetch(request).then(response => {
-        if (response.ok && response.type === "basic") {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, copy));
-        }
-        return response;
-      });
-    })
+    caches.match(request).then(cached => cached || fetch(request))
   );
 });
