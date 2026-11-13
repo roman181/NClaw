@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#090d18">
+  <meta name="description" content="NClaw lokale AI-Kommandozentrale">
+  <title>NClaw · Command Center</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#overview"><span class="brand-mark">N</span><span><b>NCLAW</b><small>COMMAND CENTER</small></span></a>
+      <div class="side-label">ARBEITSPLATZ</div>
+      <nav class="nav">
+        <a class="nav-link active" href="#overview" data-page="overview"><span>◫</span> Übersicht</a>
+        <a class="nav-link" href="#tasks" data-page="tasks"><span>▤</span> Aufgaben <i id="task-count">0</i></a>
+        <a class="nav-link" href="#agents" data-page="agents"><span>◇</span> Agenten</a>
+        <a class="nav-link" href="#commands" data-page="commands"><span>⌘</span> Kommandozentrale</a>
+        <a class="nav-link" href="#activity" data-page="activity"><span>◷</span> Aktivitäten</a>
+      </nav>
+      <div class="side-label">SYSTEM</div>
+      <nav class="nav">
+        <a class="nav-link" href="#security" data-page="security"><span>⬡</span> Sicherheit</a>
+        <a class="nav-link" href="#settings" data-page="settings"><span>⚙</span> Einstellungen</a>
+      </nav>
+      <div class="sidebar-bottom"><span class="pulse"></span><span><b>Local-first aktiv</b><small>Nur auf diesem Gerät</small></span></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="menu-toggle" id="menu-toggle" aria-label="Menü öffnen">☰</button>
+        <div class="crumb">NClaw <span>/</span> <b id="page-crumb">Übersicht</b></div>
+        <div class="top-actions"><span class="local-pill"><span class="pulse"></span> LOCAL</span><button class="icon-button" id="refresh" title="Aktualisieren">↻</button></div>
+      </header>
+
+      <section class="page active" id="page-overview">
+        <div class="welcome"><div><div class="eyebrow">PERSÖNLICHE KI-KOMMANDOZENTRALE</div><h1>Guten Tag. <span>System bereit.</span></h1><p>Dein lokales NClaw Kontrollzentrum – Aufgaben, Agenten und Systemstatus an einem Ort.</p></div><div class="date-chip" id="today">LOKALER BETRIEB</div></div>
+        <div class="status-banner"><div class="status-orb">✳</div><div><b id="system-title">NClaw Core erreichbar</b><small id="system-detail">Verbindung zum lokalen Dashboard wird geprüft …</small></div><span class="status-tag" id="system-tag">PRÜFUNG</span></div>
+        <div class="stats-grid">
+          <article class="stat-card"><div class="stat-head"><span>Aufgaben gesamt</span><span class="stat-icon">▤</span></div><strong id="stat-total">—</strong><small>Lokales Aufgabenregister</small></article>
+          <article class="stat-card"><div class="stat-head"><span>In Bearbeitung</span><span class="stat-icon green">◉</span></div><strong id="stat-progress">—</strong><small>Aktive Aufgaben</small></article>
+          <article class="stat-card"><div class="stat-head"><span>Warteschlange</span><span class="stat-icon violet">◷</span></div><strong id="stat-queued">—</strong><small>Bereit zur Bearbeitung</small></article>
+          <article class="stat-card"><div class="stat-head"><span>Abgeschlossen</span><span class="stat-icon blue">✓</span></div><strong id="stat-done">—</strong><small>Erfolgreich erledigt</small></article>
+        </div>
+        <div class="content-grid">
+          <article class="panel"><div class="panel-head"><div><h2>Letzte Aufgaben</h2><p>Dein aktueller Arbeitsstand</p></div><a href="#tasks" class="text-link">Alle ansehen →</a></div><div id="recent-tasks" class="task-list empty">Noch keine Aufgaben vorhanden.</div></article>
+          <article class="panel"><div class="panel-head"><div><h2>Systemmodule</h2><p>Verfügbare Bereiche</p></div></div><div class="module-list"><div><span class="module-icon">🧠</span><span><b>Nexus Core</b><small>Agenten-Orchestrierung</small></span><em class="module-state">INTEGRATION</em></div><div><span class="module-icon">🛡</span><span><b>Sandmann</b><small>Sandbox & Quarantäne</small></span><em class="module-state">GESCHÜTZT</em></div><div><span class="module-icon">◈</span><span><b>TokenGuard</b><small>Token-Kontrolle</small></span><em class="module-state">INTEGRATION</em></div><div><span class="module-icon">▤</span><span><b>Task Engine</b><small>Lokale Aufgabenverwaltung</small></span><em class="module-state online">BEREIT</em></div></div></article>
+        </div>
+        <article class="panel quick-panel"><div class="panel-head"><div><h2>Schnellzugriff</h2><p>Häufig verwendete Aktionen</p></div></div><div class="quick-actions"><button class="quick-action" data-go="tasks"><span>＋</span><b>Aufgabe erstellen</b><small>Neue Aufgabe anlegen</small></button><button class="quick-action" data-go="agents"><span>◇</span><b>Agenten ansehen</b><small>Modulübersicht öffnen</small></button><button class="quick-action" data-go="commands"><span>⌘</span><b>Kommandozentrale</b><small>Erlaubte Aktionen verwalten</small></button></div></article>
+      </section>
+
+      <section class="page" id="page-tasks"><div class="page-heading"><div><div class="eyebrow">PLANUNG & FORTSCHRITT</div><h1>Aufgaben</h1><p>Lokale Aufgaben anlegen, priorisieren und nachverfolgen.</p></div><button class="primary-button" id="new-task">＋ Neue Aufgabe</button></div><div class="filter-row"><select id="task-filter"><option value="">Alle Status</option><option value="queued">Warteschlange</option><option value="in_progress">In Bearbeitung</option><option value="blocked">Blockiert</option><option value="completed">Abgeschlossen</option><option value="failed">Fehlgeschlagen</option><option value="cancelled">Abgebrochen</option></select><span id="task-total-label"></span></div><div class="panel table-panel"><div id="all-tasks" class="task-list empty">Aufgaben werden geladen …</div></div></section>
+
+      <section class="page" id="page-agents"><div class="page-heading"><div><div class="eyebrow">INTELLIGENTE MODULE</div><h1>Agenten</h1><p>Übersicht der vorgesehenen NClaw-Spezialmodule.</p></div></div><div class="agent-grid"><article class="panel agent-card"><span class="agent-symbol">🧠</span><h2>Nexus</h2><p>Zentrale Planung und Koordination von Aufgaben und Agenten.</p><span class="module-state">KERNMODUL · STATUS NICHT LIVE GEPRÜFT</span></article><article class="panel agent-card"><span class="agent-symbol">🛡</span><h2>Sandmann</h2><p>Isolierte Verarbeitung, Sandbox und Quarantäne-Workflows.</p><span class="module-state">SCHUTZMODUL · STATUS NICHT LIVE GEPRÜFT</span></article><article class="panel agent-card"><span class="agent-symbol">◈</span><h2>TokenGuard</h2><p>Kontrolle von Tokenverbrauch und konfigurierten Grenzen.</p><span class="module-state">KONTROLLMODUL · STATUS NICHT LIVE GEPRÜFT</span></article><article class="panel agent-card"><span class="agent-symbol">▤</span><h2>Task Engine</h2><p>Lokale Aufgabenliste mit nachvollziehbarem Statusverlauf.</p><span class="module-state online">VERFÜGBAR</span></article></div></section>
+
+      <section class="page" id="page-commands"><div class="page-heading"><div><div class="eyebrow">KONTROLLIERTE AKTIONEN</div><h1>Kommandozentrale</h1><p>Nur ausdrücklich freigegebene, lokale Aktionen. Keine freie Shell-Ausführung.</p></div></div><div class="command-layout"><article class="panel"><div class="panel-head"><div><h2>Aufgaben-Aktionen</h2><p>Diese Befehle wirken ausschließlich auf das lokale Aufgabenregister.</p></div></div><div class="command-list"><button data-command="list"><span>▤</span><div><b>Aufgaben auflisten</b><small>Gespeicherte Aufgaben laden</small></div><em>LESEN</em></button><button data-command="create"><span>＋</span><div><b>Neue Aufgabe anlegen</b><small>Eintrag mit Priorität erstellen</small></div><em>SCHREIBEN</em></button><button data-command="refresh"><span>↻</span><div><b>Status aktualisieren</b><small>Lokale Daten neu einlesen</small></div><em>LESEN</em></button></div></article><article class="panel safety-panel"><span class="safety-icon">⬡</span><h2>Sicherheitsgrenzen</h2><ul><li>Keine beliebigen Terminal- oder Shell-Befehle</li><li>Keine externen API-Aufrufe durch dieses Dashboard</li><li>Keine Datei-Lösch- oder Systemänderungsfunktion</li><li>Server bindet standardmäßig nur an 127.0.0.1</li><li>Statuswechsel folgen festen Regeln</li></ul><div class="safe-note">Aktionen sind lokal, begrenzt und nachvollziehbar.</div></article></div></section>
+
+      <section class="page" id="page-activity"><div class="page-heading"><div><div class="eyebrow">SYSTEMVERLAUF</div><h1>Aktivitäten</h1><p>Aktuell verfügbare Ereignisübersicht aus den Aufgaben.</p></div></div><div class="panel"><div id="activity-list" class="activity-list empty">Noch keine Aktivitäten vorhanden.</div></div></section>
+      <section class="page" id="page-security"><div class="page-heading"><div><div class="eyebrow">SCHUTZ & KONTROLLE</div><h1>Sicherheit</h1><p>Die Oberfläche ist für lokale Nutzung konzipiert.</p></div></div><div class="panel security-cards"><div><b>127.0.0.1</b><small>Standardmäßig nur lokaler Zugriff</small></div><div><b>Allowlist</b><small>Nur definierte API-Endpunkte</small></div><div><b>Keine Shell</b><small>Keine Kommandoausführung aus dem Browser</small></div><div><b>SQLite</b><small>Aufgaben bleiben lokal gespeichert</small></div></div></section>
+      <section class="page" id="page-settings"><div class="page-heading"><div><div class="eyebrow">KONFIGURATION</div><h1>Einstellungen</h1><p>Informationen zur aktuellen Dashboard-Instanz.</p></div></div><div class="panel settings-list"><div><span>Modus</span><b>Local-first</b></div><div><span>Datenspeicher</span><b>SQLite · ~/.nclaw</b></div><div><span>Netzwerk</span><b>Loopback · 127.0.0.1</b></div><div><span>Agent-Ausführung</span><b>Über dieses Dashboard deaktiviert</b></div></div></section>
+      <footer> NCLAW COMMAND CENTER <span>·</span> LOCAL-FIRST AI WORKSPACE <span class="footer-right" id="footer-status">Verbindung wird geprüft</span></footer>
+    </main>
+  </div>
+
+  <dialog id="task-dialog"><form id="task-form"><div class="dialog-head"><div><div class="eyebrow">AUFGABENREGISTER</div><h2>Neue Aufgabe</h2></div><button type="button" class="close-button" id="close-dialog">×</button></div><label for="title">Titel</label><input id="title" name="title" maxlength="200" required placeholder="Was soll erledigt werden?"><label for="description">Beschreibung</label><textarea id="description" name="description" rows="3" maxlength="20000" placeholder="Optionale Details …"></textarea><label for="priority">Priorität</label><select id="priority" name="priority"><option value="1">1 · Sehr hoch</option><option value="2">2 · Hoch</option><option value="3" selected>3 · Normal</option><option value="4">4 · Niedrig</option><option value="5">5 · Sehr niedrig</option></select><div class="dialog-actions"><button type="button" class="secondary-button" id="cancel-dialog">Abbrechen</button><button type="submit" class="primary-button">Aufgabe speichern</button></div></form></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>
