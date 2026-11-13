@@ -447,7 +447,7 @@ MODEL_NAME=llama3.2
 
 # NClaw
 NCLAW_ENV=development
-NCLAW_LOG_LEVEL=INFO
+NCLAW_LOG_LEVEL=INFO\nNCLAW_WORKSPACE=workspace
 
 Wenn Ollama auf einem anderen Rechner läuft:
 
@@ -476,8 +476,11 @@ python -m agents.telegram.bot
 ```
 
 Verfügbare Telegram-Befehle: `/help`, `/status` und `/ask Deine Frage`.
-Der Bot akzeptiert ausschließlich Nachrichten von der konfigurierten Chat-ID.
-Er führt keine Shell-Befehle aus. Freigaben können mit `/request AKTION | DETAILS` angelegt und mit `/approve ID` oder `/deny ID` entschieden werden. `/pending` zeigt offene Anfragen. Eine Zustimmung protokolliert nur die Freigabe und führt noch keine Aktion aus. Freigaben verfallen nach 10 Minuten, gelten nur einmal und werden beim Neustart verworfen. Ein späterer Aktions-Handler muss `ApprovalManager.consume()` unmittelbar vor der Aktion aufrufen. Für den Betrieb muss der Rechner mit Ollama erreichbar sein. Beende den Polling-Prozess mit Ctrl+C.
+Der Bot akzeptiert ausschließlich Nachrichten von der konfigurierten Chat-ID und führt keine Shell-Befehle aus.
+
+**Freigegebene Dateierstellung:** Mit `/propose_file PFAD | INHALT` kann eine neue Textdatei vorgeschlagen werden. Der Bot zeigt Pfad und vollständigen Inhalt zur Prüfung an. Erst `/approve ID` genehmigt den exakt gebundenen Vorschlag; erst ein separater `/execute ID`-Befehl legt die Datei an. `/deny ID` lehnt ab und `/pending` zeigt offene Freigaben. Die Datei wird ausschließlich im konfigurierten `NCLAW_WORKSPACE` (Standard: `workspace/`) angelegt. Vorhandene Dateien, `.env`-Dateien, `.git` und Pfad-Ausbrüche sind gesperrt; Elternordner müssen bereits existieren. Dateien werden mit restriktiven Rechten angelegt. Freigaben und Dateivorschläge verfallen nach 10 Minuten, gelten einmal und gehen beim Neustart verloren. Allgemeine `/request`-Anfragen bleiben reine Freigabe-Einträge und führen keine Aktion aus.
+
+Für den Betrieb muss der Rechner mit Ollama erreichbar sein. Beende den Polling-Prozess mit Ctrl+C.
 
 ---
 
@@ -619,7 +622,7 @@ Phase 2 – Agenten
 - [x] Telegram-Agent (sichere Basis: Allowlist, /ask, /status, /help)
 - [ ] Sandmann-Agent
 - [ ] Agentenverwaltung
-- [x] Telegram-Freigabe-Basis (Ablaufzeit, Einmalfreigabe, Aktionsbindung; noch keine Aktionsausführung)
+- [x] Telegram-Freigabe-Basis (Ablaufzeit, Einmalfreigabe, Aktionsbindung)\n- [x] Erste kontrollierte Aktion: neue Textdatei im Workspace nach separater Freigabe und Ausführungsbefehl
 - [ ] Aufgabenverwaltung
 
 Phase 3 – Bibliothek
