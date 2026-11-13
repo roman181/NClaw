@@ -309,3 +309,66 @@ def test_command_center_exposes_only_read_only_diagnostics_controls(tmp_path: Pa
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+def test_agent_models_endpoint_lists_metadata_without_loading_models(monkeypatch):
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc_value, traceback):
+            return False
+
+        def read(self, size):
+            assert size == 32_768
+            return json.dumps({"models": [
+                {"name": "llama3:latest", "size": 1024, "modified_at": "2026-11-13T10:00:00Z"},
+                {"name": "qwen2:latest", "size": 2048},
+                {"digest": "ignored"},
+            ]}).encode()
+
+    class Opener:
+        def open(self, request, timeout):
+            assert request.full_url == "http://127.0.0.1:11434/api/tags"
+            assert request.get_method() == "GET"
+            assert timeout == 1.0
+            return Response()
+
+    monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:11434")
+    monkeypatch.setattr(dashboard_server, "ollama_status", lambda: {
+        "ok": True, "available": True, "endpoint": "127.0.0.1:11434",
+    })
+    monkeypatch.setattr(dashboard_server, "build_opener", lambda *handlers: Opener())
+    result = dashboard_server.ollama_models()
+    assert result["available"] is True
+    assert [model["name"] for model in result["models"]] == ["llama3:latest", "qwen2:latest"]
+    assert result["models"][0]["size"] == 1024
+
+
+def test_agent_models_endpoint_returns_empty_when_ollama_unavailable(monkeypatch):
+    monkeypatch.setattr(dashboard_server, "ollama_status", lambda: {
+        "ok": True, "available": False, "endpoint": "127.0.0.1:11434",
+    })
+    result = dashboard_server.ollama_models()
+    assert result["available"] is False
+    assert result["models"] == []
+
+
+def test_backup_history_returns_json_serializable_timestamp(tmp_path: Path, monkeypatch):
+    store = TaskStore(tmp_path / "private" / "tasks.sqlite3")
+    backup_dir = store.path.parent / "backups"
+    backup_dir.mkdir()
+    store.backup(backup_dir / "tasks-json.sqlite3")
+    monkeypatch.setattr(dashboard_server, "STORE", store)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        with urlopen(f"http://127.0.0.1:{server.server_port}/api/backups", timeout=3) as response:
+            payload = json.loads(response.read())
+            assert response.status == 200
+            assert payload["backups"][0]["modified_at"].endswith("+00:00")
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
