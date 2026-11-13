@@ -746,7 +746,7 @@ Phase 5 – Evolution
 Phase 6 – Dashboard
 
 - [ ] Nexus Chat
-- [ ] Agentenstatus
+- [x] Agentenstatus (lokale Ollama-Erreichbarkeit; Statusprüfung ohne Modellstart)
 - [ ] Start/Stop-Lernschleife
 - [ ] Skill-Verwaltung
 - [ ] Einstellungen
@@ -981,3 +981,7 @@ Das lokale Dashboard kann auf Android in Chromium-basierten Browsern als App-Ver
 Die PWA-Konfiguration liegt in `dashboard/static/manifest.webmanifest`. Der Service Worker speichert nur die statische Oberfläche (HTML, CSS, JavaScript, Manifest und Icon) zwischen. API-Antworten unter `/api/` werden ausdrücklich nicht gecacht; Aufgaben- und Systemdaten bleiben live und lokal. Wenn NClaw gestoppt ist, bleibt die Oberfläche möglicherweise sichtbar, aber dynamische Funktionen benötigen den laufenden lokalen Server.
 
 Die Installation benötigt keine Cloud, keinen externen Dienst und keine zusätzlichen Python-Abhängigkeiten. Das Dashboard bleibt an `127.0.0.1` gebunden.
+
+### Lokaler Ollama-Status
+
+Im Bereich **Agenten** zeigt NClaw zusätzlich, ob Ollama auf `127.0.0.1:11434` erreichbar ist. Die Prüfung fragt ausschließlich `GET /api/version` mit kurzem Timeout ab und zeigt die erkannte Version an. Sie lädt keine Modellliste, startet keine Inferenz und führt keine Befehle aus. Läuft Ollama auf einem anderen Gerät, wird dieser lokale Status bewusst als nicht erreichbar angezeigt; die Dashboard-Prüfung scannt keine Netzwerkgeräte.
