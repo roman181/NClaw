@@ -166,6 +166,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if path == "/api/tasks":
             self._json(200, {"tasks": STORE.list(limit=200)})
             return
+        prefix, suffix = "/api/tasks/", "/history"
+        if path.startswith(prefix) and path.endswith(suffix):
+            task_id = path[len(prefix):-len(suffix)]
+            try:
+                self._json(200, {"events": STORE.history(task_id)})
+            except KeyError as exc:
+                self._json(404, {"error": str(exc)})
+            return
         files = {
             "/": "index.html",
             "/index.html": "index.html",
