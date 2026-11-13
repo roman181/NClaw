@@ -167,6 +167,21 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if path == "/api/tasks":
             self._json(200, {"tasks": STORE.list(limit=200)})
             return
+        if path == "/api/backups":
+            backup_dir = STORE.path.parent / "backups"
+            backups = []
+            if backup_dir.is_dir() and not backup_dir.is_symlink():
+                for item in backup_dir.iterdir():
+                    if item.name.startswith("tasks-") and item.name.endswith(".sqlite3") and not item.is_symlink() and item.is_file():
+                        info = item.stat()
+                        backups.append({
+                            "filename": item.name,
+                            "size": info.st_size,
+                            "modified_at": datetime.fromtimestamp(info.st_mtime, UTC).isoformat(),
+                        })
+            backups.sort(key=lambda item: item["modified_at"], reverse=True)
+            self._json(200, {"backups": backups[:20]})
+            return
         prefix, suffix = "/api/tasks/", "/history"
         if path.startswith(prefix) and path.endswith(suffix):
             task_id = path[len(prefix):-len(suffix)]
