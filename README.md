@@ -945,6 +945,7 @@ NCLAW_DASHBOARD_PORT=9000 python -m dashboard.server
 - Bindet standardmäßig ausschließlich an `127.0.0.1`.
 - Prüft den HTTP-`Host`-Header auf eine Loopback-Adresse und den tatsächlich verwendeten lokalen Port (Schutz gegen DNS-Rebinding).
 - Browser-Schreibzugriffe mit fremdem `Origin` oder `Sec-Fetch-Site` werden abgewiesen; lokale gleich-originige Dashboard-Aufrufe bleiben möglich.
+- Das Dashboard darf nicht in fremde Frames eingebettet werden (`frame-ancestors 'none'` und `X-Frame-Options: DENY`).
 - Keine beliebige Shell-, Python- oder Terminal-Ausführung.
 - Keine Agentenstarts oder externen API-Aufrufe aus dem Dashboard.
 - Nur fest definierte HTTP-Routen.

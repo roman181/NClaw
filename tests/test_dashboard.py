@@ -21,6 +21,8 @@ def test_dashboard_serves_ui_and_local_task_api(tmp_path: Path, monkeypatch):
     try:
         with urlopen(base + "/", timeout=3) as response:
             assert response.status == 200
+            assert response.headers["X-Frame-Options"] == "DENY"
+            assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
             assert b"NClaw" in response.read()
 
         payload = json.dumps({"title": "Dashboard testen", "priority": 2}).encode()

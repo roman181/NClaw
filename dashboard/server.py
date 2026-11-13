@@ -401,7 +401,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(content)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:")
+        self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'")
+        self.send_header("X-Frame-Options", "DENY")
         self.end_headers()
         self.wfile.write(content)
 
