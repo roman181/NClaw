@@ -181,3 +181,49 @@ class TaskStore:
                 (task_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def backup(self, destination: str | Path) -> Path:
+        """Create a new SQLite-consistent backup without overwriting existing files."""
+        target = Path(destination).expanduser()
+        if target.is_symlink():
+            raise ValueError("Backup destination must not be a symbolic link")
+        target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            target.parent.chmod(0o700)
+        except OSError:
+            pass
+        target = target.parent.resolve() / target.name
+        if target == self.path:
+            raise ValueError("Backup destination must differ from the task database")
+
+        # Exclusive creation prevents accidental overwrite and symlink substitution.
+        try:
+            descriptor = os.open(target, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError as exc:
+            raise FileExistsError(f"Backup already exists: {target}") from exc
+        os.close(descriptor)
+
+        source = None
+        backup = None
+        try:
+            source = sqlite3.connect(self.path, timeout=10)
+            backup = sqlite3.connect(target, timeout=10)
+            source.backup(backup)
+            result = backup.execute("PRAGMA integrity_check").fetchone()
+            if result is None or result[0] != "ok":
+                raise sqlite3.DatabaseError("Backup integrity check failed")
+            backup.close()
+            backup = None
+            try:
+                target.chmod(0o600)
+            except OSError:
+                pass
+            return target
+        except Exception:
+            if backup is not None:
+                backup.close()
+            target.unlink(missing_ok=True)
+            raise
+        finally:
+            if source is not None:
+                source.close()
