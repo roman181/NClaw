@@ -447,7 +447,8 @@ MODEL_NAME=llama3.2
 
 # NClaw
 NCLAW_ENV=development
-NCLAW_LOG_LEVEL=INFO\nNCLAW_WORKSPACE=workspace
+NCLAW_LOG_LEVEL=INFO
+NCLAW_WORKSPACE=workspace
 
 Wenn Ollama auf einem anderen Rechner läuft:
 
@@ -623,7 +624,8 @@ Phase 2 – Agenten
 - [x] Telegram-Agent (sichere Basis: Allowlist, /ask, /status, /help)
 - [ ] Sandmann-Agent
 - [ ] Agentenverwaltung
-- [x] Telegram-Freigabe-Basis (Ablaufzeit, Einmalfreigabe, Aktionsbindung)\n- [x] Erste kontrollierte Aktion: neue Textdatei im Workspace nach separater Freigabe und Ausführungsbefehl
+- [x] Telegram-Freigabe-Basis (Ablaufzeit, Einmalfreigabe, Aktionsbindung)
+- [x] Erste kontrollierte Aktion: neue Textdatei im Workspace nach separater Freigabe und Ausführungsbefehl
 - [ ] Aufgabenverwaltung
 
 Phase 3 – Bibliothek
