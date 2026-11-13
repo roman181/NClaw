@@ -1,14 +1,14 @@
-🧠 NClaw – Autonomous AI Agent Framework
+# 🧠 NClaw – Autonomous AI Agent Framework
 
-"CI" (https://github.com/roman181/NClaw/actions/workflows/ci.yml/badge.svg)
-"Security" (https://github.com/roman181/NClaw/actions/workflows/security.yml/badge.svg)
-"Termux" (https://github.com/roman181/NClaw/actions/workflows/termux.yml/badge.svg)
-
-"Status" (https://img.shields.io/badge/status-Konzeptphase-orange)
-"Architecture" (https://img.shields.io/badge/architecture-modular-blue)
-"Local First" (https://img.shields.io/badge/local--first-yes-green)
-"Platform" (https://img.shields.io/badge/platform-Android%20%7C%20Linux-lightgrey)
-"License" (https://img.shields.io/badge/license-Apache--2.0-blue)
+[![CI](https://github.com/roman181/NClaw/actions/workflows/ci.yml/badge.svg)](https://github.com/roman181/NClaw/actions/workflows/ci.yml)
+[![Security](https://github.com/roman181/NClaw/actions/workflows/security.yml/badge.svg)](https://github.com/roman181/NClaw/actions/workflows/security.yml)
+[![Termux](https://github.com/roman181/NClaw/actions/workflows/termux.yml/badge.svg)](https://github.com/roman181/NClaw/actions/workflows/termux.yml)
+[![Links](https://github.com/roman181/NClaw/actions/workflows/links.yml/badge.svg)](https://github.com/roman181/NClaw/actions/workflows/links.yml)
+![Status](https://img.shields.io/badge/status-active%20development-orange)
+![Architecture](https://img.shields.io/badge/architecture-modular-blue)
+![Local First](https://img.shields.io/badge/local--first-yes-green)
+![Platform](https://img.shields.io/badge/platform-Android%20%7C%20Linux-lightgrey)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue)
 
 NClaw ist ein autonomes, local-first KI-Agenten-Framework, das aus einem einfachen Chat einen proaktiven digitalen Mitarbeiter macht.
 
