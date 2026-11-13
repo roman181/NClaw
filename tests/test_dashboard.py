@@ -90,7 +90,7 @@ def test_task_history_endpoint_returns_auditable_status_events(tmp_path: Path, m
     worker = Thread(target=server.serve_forever, daemon=True)
     worker.start()
     try:
-        url = f"http://127.0.0.1:{server.server_port}/api/tasks/{task["id"]}/history"
+        url = "http://127.0.0.1:{}/api/tasks/{}/history".format(server.server_port, task["id"])
         with urlopen(url, timeout=3) as response:
             payload = json.loads(response.read())
             assert response.status == 200
