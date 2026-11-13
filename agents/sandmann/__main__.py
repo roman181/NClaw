@@ -14,12 +14,16 @@ def main() -> None:
     intake.add_argument("path")
     inspect = sub.add_parser("inspect", help="Importierte Datei analysieren")
     inspect.add_argument("path")
+    approve = sub.add_parser("approve", help="Datei nach manueller Prüfung nach approved verschieben")
+    approve.add_argument("path")
     args = parser.parse_args()
     agent = SandmannAgent()
     if args.command == "import":
         result = agent.import_file(args.path)
-    else:
+    elif args.command == "inspect":
         result = agent.inspect(args.path)
+    else:
+        result = {"approved_path": str(agent.storage.move_to(args.path, "approved"))}
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
