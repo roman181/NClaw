@@ -28,7 +28,7 @@ Die Steuerung erfolgt über eine zentrale Benutzeroberfläche und optional über
 - "4. Agententeam" (#-4-agententeam)
 - "5. Hauptfunktionen" (#-5-hauptfunktionen)
 - "6. Skill-Evolution" (#-6-skill-evolution)
-- "7. Llama-Einzelmodell" (#-7-zwei-modell-debatte)
+- "7. Llama-Einzelmodell" (#-7-llama-einzelmodell)
 - "8. TokenGuard" (#-8-tokenguard)
 - "9. Sicherheit" (#-9-sicherheit)
 - "10. Voraussetzungen" (#-10-voraussetzungen)
@@ -111,8 +111,7 @@ Komponenten
 - Nexus: Zentrale Steuerung und Aufgabenverteilung.
 - Telegram-Agent: Kommunikation und Freigaben.
 - Sandmann: Dateiverarbeitung und Bibliotheksverwaltung.
-- Llama: Erstes lokales KI-Modell.
-- Llama: Zweites lokales KI-Modell.
+- Llama: Einziges lokales KI-Modell für Analyse und Antworten.
 - TokenGuard: Modellwechsel und Kontextübergabe.
 - Skill-Baum: Visualisierung der Fähigkeiten.
 - Sandbox-Ai: Isolierte Prüfung unbekannter Daten und Skills.
@@ -271,28 +270,24 @@ Beispiel:
 
 NClaw nutzt ausschließlich ein lokales Llama-Modell über Ollama.
 
-Modell| Aufgabe
+Komponente | Aufgabe
 Llama | Analyse, Planung, Antwort und Selbstprüfung
-Nexus| Koordination und Entscheidung
+Nexus | Koordination und Entscheidung
 
 Ablauf
 
 1. Nexus erstellt eine Aufgabe.
-2. Llama bearbeitet die Aufgabe und prüft seine Antwort vor der Ausgabe.
-4. Beide Ergebnisse werden verglichen.
-5. Unstimmigkeiten werden diskutiert.
-6. Nexus bewertet die Ergebnisse.
-7. Bei Bedarf wird eine dritte Meinung angefragt.
+2. Llama bearbeitet die Aufgabe.
+3. Llama prüft die Antwort anhand der Aufgabenanforderungen.
+4. Nexus kontrolliert den Ablauf und gibt das Ergebnis aus.
 
-Maximal 25 Diskussionsrunden sind vorgesehen.
-
-Nach 25 Runden ohne ausreichende Einigung wird die Aufgabe angehalten und eine dritte Meinung kann nach Freigabe über einen externen Dienst eingeholt werden.
+Es wird kein zweites KI-Modell und kein externer KI-Dienst automatisch aufgerufen.
 
 ---
 
 🛡️ 8. TokenGuard
 
-TokenGuard überwacht die verfügbare Kontextkapazität der aktiven Modelle.
+TokenGuard überwacht die verfügbare Kontextkapazität des Llama-Modells.
 
 Geplanter Ablauf:
 
@@ -300,9 +295,9 @@ Geplanter Ablauf:
 - Bei 90 % einen Handoff auslösen.
 - Projektstatus als JSON sichern.
 - Offene Aufgaben dokumentieren.
-- Nächstes Modell auswählen.
-- Kontext übergeben.
-- Arbeit fortsetzen.
+- Einen JSON-Zwischenstand sichern.
+- Kontext für eine spätere Fortsetzung bereitstellen.
+- Arbeit nach Freigabe fortsetzen.
 
 Beispiel einer Übergabe
 
@@ -497,8 +492,9 @@ nclaw/
 │   └── sandmann/
 │
 ├── models/
+│   ├── __init__.py
 │   ├── ollama.py
-│ │   ├── llama.py
+│   ├── llama.py
 │   └── cloud_adapter.py
 │
 ├── skills/
@@ -590,8 +586,7 @@ Phase 1 – Grundsystem
 - [ ] Konfigurationssystem
 - [ ] Lokale Speicherung
 - [x] Ollama-Anbindung (Basis)
-- [x] Llama-Integration
-- [x] Llama-Integration
+- [x] Llama-Integration (einziges Modell)
 
 Phase 2 – Agenten
 
@@ -612,7 +607,7 @@ Phase 3 – Bibliothek
 
 Phase 4 – Intelligenz
 
-- [ ] Llama-Einzelmodell
+- [x] Llama-Einzelmodell (Basis)
 - [ ] TokenGuard
 - [ ] JSON-Handoff
 - [ ] Skill-Registry
