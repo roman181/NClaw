@@ -21,6 +21,35 @@ WEB_ROOT = Path(__file__).resolve().parent / "static"
 STORE = TaskStore()
 
 
+def ollama_status() -> dict[str, object]:
+    """Check only the fixed local Ollama version endpoint; never run models or commands."""
+    from urllib.error import URLError
+    from urllib.request import Request, urlopen
+
+    request = Request(
+        "http://127.0.0.1:11434/api/version",
+        headers={"Accept": "application/json"},
+        method="GET",
+    )
+    try:
+        with urlopen(request, timeout=0.6) as response:
+            payload = json.loads(response.read(4096))
+        version = payload.get("version") if isinstance(payload, dict) else None
+        return {
+            "ok": True,
+            "available": isinstance(version, str) and bool(version),
+            "version": version if isinstance(version, str) else None,
+            "endpoint": "127.0.0.1:11434",
+        }
+    except (URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+        return {
+            "ok": True,
+            "available": False,
+            "version": None,
+            "endpoint": "127.0.0.1:11434",
+        }
+
+
 def system_metrics() -> dict[str, object]:
     """Return best-effort, read-only host metrics without optional dependencies."""
     memory = None
@@ -88,6 +117,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/system":
             self._json(200, system_metrics())
+            return
+        if path == "/api/agent-status":
+            self._json(200, ollama_status())
             return
         if path == "/api/tasks":
             self._json(200, {"tasks": STORE.list(limit=200)})
