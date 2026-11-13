@@ -1033,7 +1033,7 @@ Die Kommandozentrale verbindet jetzt drei getrennte, lokal kontrollierte Abläuf
 2. Der Vorschlag wird als `pending` in der Freigabeverwaltung angezeigt. Vor der Freigabe wird nichts ausgeführt.
 3. Die Schaltfläche **Freigeben** autorisiert nur genau diese Aktion und den unveränderten JSON-Inhalt. **Ablehnen** beendet den Vorschlag.
 4. Erst ein zusätzlicher Klick auf **Jetzt ausführen** konsumiert die Freigabe einmalig und legt die Aufgabe an.
-5. Freigaben verfallen nach zehn Minuten. Die Registry ist im Arbeitsspeicher; beim Serverneustart werden offene Freigaben verworfen.
+5. Freigaben verfallen nach zehn Minuten. Freigaben, die dafür nötigen begrenzten JSON-Payloads und der Ausführungsverlauf liegen lokal in `~/.nclaw/approvals.sqlite3` (im Verzeichnis der Aufgaben-Datenbank). Pending-/Approved-Freigaben bleiben über einen Neustart erhalten, verfallen aber weiterhin nach zehn Minuten. Der einmalige Verbrauch wird mit einer SQLite-Transaktion atomar gesichert. Es werden keine Modell-Prompts oder Inferenzantworten in diesem Audit-Register gespeichert.
 
 Die API-Endpunkte sind `GET /api/approvals`, `POST /api/agent-actions/propose`, `POST /api/approvals/{id}/decision`, `POST /api/agent-executions` und `GET /api/agent-executions`. Die Registry schützt Freigabeänderungen und einmaligen Verbrauch mit einem Lock. Es gibt keine Shell-, dynamische Code- oder freie Funktionsausführung.
 
@@ -1043,4 +1043,4 @@ Im Bereich **Agenten** kann ein installiertes Ollama-Modell ausgewählt und mit 
 
 ### Tests und Statusgrenzen
 
-`tests/test_agent_dashboard.py` prüft den vollständigen Ablauf (Vorschlag, fehlende Freigabe, Freigabe, separate Ausführung, einmalige Nutzung), Ablehnung, Eingabe-Allowlist, getrennte Inferenz und die UI-Kontrollen. Inferenz wird nur durch expliziten Formularaufruf gestartet. Die Ausführungs- und Freigabeverläufe sind bis zu einem Serverneustart verfügbar; sie sind keine persistente Audit-Datenbank.
+`tests/test_agent_dashboard.py` prüft den vollständigen Ablauf (Vorschlag, fehlende Freigabe, Freigabe, separate Ausführung, einmalige Nutzung), Ablehnung, Eingabe-Allowlist, getrennte Inferenz und die UI-Kontrollen. Inferenz wird nur durch expliziten Formularaufruf gestartet. Freigaben und Ausführungsverläufe sind persistent und lokal in `approvals.sqlite3` gespeichert. Die Datenbank wird mit restriktiven Dateirechten angelegt. Der Runtime-Handler muss nach einem Neustart weiterhin ausdrücklich registriert sein; es gibt keine automatische Wiederaufnahme oder Ausführung.
