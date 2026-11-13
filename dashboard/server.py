@@ -92,22 +92,37 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if path == "/api/tasks":
             self._json(200, {"tasks": STORE.list(limit=200)})
             return
-        files = {"/": "index.html", "/index.html": "index.html", "/style.css": "style.css", "/app.js": "app.js"}
+        files = {
+            "/": "index.html",
+            "/index.html": "index.html",
+            "/style.css": "style.css",
+            "/app.js": "app.js",
+            "/manifest.webmanifest": "manifest.webmanifest",
+            "/sw.js": "sw.js",
+            "/icon.svg": "icon.svg",
+        }
         filename = files.get(path)
         if filename is None:
             self._json(404, {"error": "Route not found"})
             return
         content = (WEB_ROOT / filename).read_bytes()
-        content_type = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8"}[Path(filename).suffix]
+        content_type = {
+            ".html": "text/html; charset=utf-8",
+            ".css": "text/css; charset=utf-8",
+            ".js": "text/javascript; charset=utf-8",
+            ".webmanifest": "application/manifest+json; charset=utf-8",
+            ".svg": "image/svg+xml",
+        }[Path(filename).suffix]
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(content)))
         self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Cache-Control", "no-cache")
         self.send_header("Content-Security-Policy", "default-src 'self'; style-src 'self'; font-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:")
         self.end_headers()
         self.wfile.write(content)
 
-    def do_POST(self) -> None:  # noqa: N802
+    def do_POST(self) -> None:
         if self.client_address[0] not in {"127.0.0.1", "::1"}:
             self._json(403, {"error": "Local access only"})
             return
@@ -138,7 +153,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._json(400, {"error": str(exc)})
 
-    def do_OPTIONS(self) -> None:  # noqa: N802
+    def do_OPTIONS(self) -> None:
         self._json(405, {"error": "Method not allowed"})
 
 
