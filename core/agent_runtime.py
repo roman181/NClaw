@@ -43,6 +43,7 @@ class AgentRuntime:
     def __init__(self, approvals: ApprovalManager | None = None) -> None:
         self.approvals = approvals or ApprovalManager()
         self._handlers: dict[str, AgentHandler] = {}
+        self._payloads: dict[str, dict[str, Any]] = {}
         self.executions: dict[str, ExecutionRecord] = {}
 
     def register(self, name: str, handler: AgentHandler) -> None:
@@ -73,23 +74,37 @@ class AgentRuntime:
     def propose(self, agent: str, payload: Mapping[str, Any]) -> ApprovalRecord:
         if agent not in self._handlers:
             raise KeyError("Agent is not registered")
-        _, digest = self._serialize_payload(payload)
-        return self.approvals.create(
+        safe_payload, digest = self._serialize_payload(payload)
+        record = self.approvals.create(
             action=f"agent.run:{agent}",
             description=f"Agentenausführung freigeben: {agent}",
             binding=digest,
         )
+        self._payloads[record.request_id] = safe_payload
+        return record
+
+    def payload_for(self, approval_id: str) -> dict[str, Any]:
+        payload = self._payloads.get(approval_id)
+        if payload is None:
+            raise KeyError("Approval payload is no longer available")
+        return json.loads(json.dumps(payload, ensure_ascii=False))
 
     def execute(
-        self, approval_id: str, agent: str, payload: Mapping[str, Any]
+        self,
+        approval_id: str,
+        agent: str,
+        payload: Mapping[str, Any] | None = None,
     ) -> tuple[ExecutionRecord, Any]:
         handler = self._handlers.get(agent)
         if handler is None:
             raise KeyError("Agent is not registered")
+        if payload is None:
+            payload = self.payload_for(approval_id)
         safe_payload, digest = self._serialize_payload(payload)
         approval = self.approvals.consume(
             approval_id, f"agent.run:{agent}", expected_binding=digest
         )
+        self._payloads.pop(approval_id, None)
         execution_id = secrets.token_urlsafe(9)
         while execution_id in self.executions:
             execution_id = secrets.token_urlsafe(9)
