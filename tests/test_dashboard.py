@@ -60,3 +60,11 @@ def test_dashboard_does_not_expose_arbitrary_command_route(tmp_path: Path, monke
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)
+
+
+def test_system_metrics_shape():
+    metrics = dashboard_server.system_metrics()
+    assert metrics["ok"] is True
+    assert isinstance(metrics["platform"], str)
+    assert 0 <= metrics["disk"]["used_percent"] <= 100
+    assert metrics["memory"] is None or 0 <= metrics["memory"]["used_percent"] <= 100
