@@ -2,7 +2,6 @@
 import pytest
 
 from core.agent_runtime import AgentExecutionError, AgentRuntime
-from core.approval_manager import ApprovalManager
 
 
 def test_agent_action_requires_matching_explicit_approval():
