@@ -5,13 +5,16 @@ It intentionally has no shell, file-management, agent-execution or internet API.
 """
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import platform
 import shutil
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit, urlunsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from tasks.store import STATUSES, TaskStore
 
@@ -21,32 +24,71 @@ WEB_ROOT = Path(__file__).resolve().parent / "static"
 STORE = TaskStore()
 
 
+class _NoRedirect(HTTPRedirectHandler):
+    """Do not allow a configured local endpoint to redirect requests elsewhere."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def ollama_status() -> dict[str, object]:
-    """Check only the fixed local Ollama version endpoint; never run models or commands."""
-    from urllib.error import URLError
-    from urllib.request import Request, urlopen
+    """Check the explicitly configured private Ollama host; never run models."""
+    configured_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").strip()
+    try:
+        parsed = urlsplit(configured_host)
+        hostname = parsed.hostname
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+        ):
+            raise ValueError("Invalid Ollama URL")
+        try:
+            address = ipaddress.ip_address(hostname)
+            allowed_host = address.is_private or address.is_loopback
+        except ValueError:
+            allowed_host = hostname.lower().endswith(".local")
+        if not allowed_host:
+            raise ValueError("Ollama host must be a private LAN or loopback address")
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        if not 1 <= port <= 65535:
+            raise ValueError("Invalid Ollama port")
+        base_url = urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+        endpoint = f"{hostname}:{port}"
+    except ValueError:
+        return {
+            "ok": True,
+            "available": False,
+            "version": None,
+            "endpoint": "Ungültige OLLAMA_HOST-Konfiguration",
+        }
 
     request = Request(
-        "http://127.0.0.1:11434/api/version",
+        f"{base_url}/api/version",
         headers={"Accept": "application/json"},
         method="GET",
     )
     try:
-        with urlopen(request, timeout=0.6) as response:
+        opener = build_opener(_NoRedirect())
+        with opener.open(request, timeout=0.8) as response:
             payload = json.loads(response.read(4096))
         version = payload.get("version") if isinstance(payload, dict) else None
         return {
             "ok": True,
             "available": isinstance(version, str) and bool(version),
             "version": version if isinstance(version, str) else None,
-            "endpoint": "127.0.0.1:11434",
+            "endpoint": endpoint,
         }
-    except (URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
         return {
             "ok": True,
             "available": False,
             "version": None,
-            "endpoint": "127.0.0.1:11434",
+            "endpoint": endpoint,
         }
 
 
