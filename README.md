@@ -93,7 +93,7 @@ flowchart TD
     A <--> D["Modell-Debatte"]
     B <--> D
 
-    D --> X["Dritte Meinung<br/>Optionaler Cloud-Dienst"]
+    D --> X["Antwortprüfung durch Llama"]
 
     S --> SB["Sandbox-Ai"]
     SB --> L["Lokale Bibliothek"]
@@ -427,7 +427,7 @@ cp .env.example .env
 
 Geplanter Startbefehl:
 
-python -m core
+python -m core --prompt "Erkläre deine Aufgabe"
 
 ---
 
