@@ -81,6 +81,43 @@ def test_dashboard_does_not_expose_arbitrary_command_route(tmp_path: Path, monke
         worker.join(timeout=3)
 
 
+def test_task_history_endpoint_returns_auditable_status_events(tmp_path: Path, monkeypatch):
+    store = TaskStore(tmp_path / "tasks.sqlite3")
+    task = store.create("Historie prüfen", priority=2)
+    store.transition(task["id"], "in_progress", "Arbeit begonnen")
+    monkeypatch.setattr(dashboard_server, "STORE", store)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/api/tasks/{task["id"]}/history"
+        with urlopen(url, timeout=3) as response:
+            payload = json.loads(response.read())
+            assert response.status == 200
+            assert [event["new_status"] for event in payload["events"]] == ["queued", "in_progress"]
+            assert payload["events"][1]["note"] == "Arbeit begonnen"
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
+
+
+def test_task_history_endpoint_returns_404_for_unknown_task(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(dashboard_server, "STORE", TaskStore(tmp_path / "tasks.sqlite3"))
+    server = ThreadingHTTPServer(("127.0.0.1", 0), dashboard_server.DashboardHandler)
+    worker = Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    try:
+        try:
+            urlopen(f"http://127.0.0.1:{server.server_port}/api/tasks/missing/history", timeout=3)
+            raise AssertionError("Unknown task history must return 404")
+        except HTTPError as error:
+            assert error.code == 404
+    finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
+
 def test_system_metrics_shape():
     metrics = dashboard_server.system_metrics()
     assert metrics["ok"] is True
