@@ -19,6 +19,7 @@ from urllib.parse import urlparse, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from core.agent_runtime import AgentExecutionError, AgentRuntime
+from core.approval_manager import ApprovalManager
 from models.llama import LlamaModel
 from models.ollama import OllamaClient, OllamaError
 from tasks.store import STATUSES, TaskStore
@@ -51,7 +52,7 @@ def _create_task_action(payload: dict[str, object]) -> dict[str, object]:
     return STORE.create(title, description, priority)
 
 
-RUNTIME = AgentRuntime()
+RUNTIME = AgentRuntime(ApprovalManager(db_path=STORE.path.parent / "approvals.sqlite3"))
 RUNTIME.register("task-assistant", _create_task_action)
 
 
@@ -73,6 +74,8 @@ def _approval_json(record) -> dict[str, object]:
 
 
 def _execution_json(record) -> dict[str, object]:
+    if isinstance(record, dict):
+        return record
     return {
         "execution_id": record.execution_id,
         "agent": record.agent,
@@ -281,11 +284,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             ]})
             return
         if path == "/api/agent-executions":
-            records = sorted(
-                RUNTIME.executions.values(),
-                key=lambda record: record.created_at,
-                reverse=True,
-            )[:50]
+            records = RUNTIME.approvals.list_executions(limit=50)
             self._json(200, {"executions": [_execution_json(record) for record in records]})
             return
         if path == "/api/tasks":
