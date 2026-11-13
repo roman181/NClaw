@@ -44,23 +44,68 @@ async function refreshAgentModels(){
   list.textContent="Modellliste wird geprüft …";
   try{
     const data=await api("/api/agent-models");
-    if(!data.available){list.innerHTML='<div class="empty">Ollama ist nicht erreichbar.</div>';return}
-    if(!data.models.length){list.innerHTML='<div class="empty">'+esc(data.error||"Keine installierten Modelle gefunden.")+'</div>';return}
+    if(!data.available){list.innerHTML='<div class="empty">Ollama ist nicht erreichbar.</div>';const selector=$("#inference-model");if(selector)selector.innerHTML='<option value="">Ollama nicht erreichbar</option>';return}
+    if(!data.models.length){list.innerHTML='<div class="empty">'+esc(data.error||"Keine installierten Modelle gefunden.")+'</div>';const selector=$("#inference-model");if(selector)selector.innerHTML='<option value="">Keine Modelle installiert</option>';return}
     list.innerHTML=data.models.map(model=>'<div class="agent-model-row"><div><b>'+esc(model.name)+'</b><small>'+esc(model.modified_at?new Date(model.modified_at).toLocaleDateString("de-DE"):"Änderungsdatum unbekannt")+'</small></div><span>'+fmtBytes(model.size)+'</span></div>').join("");
+    const selector=$("#inference-model");
+    if(selector){const previous=selector.value;selector.innerHTML=data.models.map(model=>'<option value="'+esc(model.name)+'">'+esc(model.name)+'</option>').join("");if(data.models.some(model=>model.name===previous))selector.value=previous;}
     if(note)note.textContent=data.models.length+" Modell(e) gefunden · Nur Metadaten gelesen";
   }catch(err){list.innerHTML='<div class="empty">Modellliste nicht verfügbar: '+esc(err.message)+'</div>'}
 }
+function approvalStatus(status){return ({pending:"WARTET AUF FREIGABE",approved:"FREIGEGEBEN · NOCH NICHT AUSGEFÜHRT",rejected:"ABGELEHNT",expired:"ABGELAUFEN",consumed:"VERBRAUCHT"})[status]||status}
+async function refreshApprovals(){
+  const list=$("#approval-list");if(!list)return;
+  list.textContent="Freigaben werden geladen …";
+  try{
+    const data=await api("/api/approvals");
+    if(!data.approvals.length){list.innerHTML='<div class="empty">Keine Freigaben vorhanden.</div>';return}
+    list.innerHTML=data.approvals.map(item=>{
+      const payload=item.payload||{};
+      const details=payload.title?"Aufgabe: "+payload.title:"";
+      const controls=item.status==="pending"
+        ?'<button class="subtle-button" data-approval-decision="approve" data-approval-id="'+esc(item.request_id)+'">Freigeben</button><button class="subtle-button danger-button" data-approval-decision="reject" data-approval-id="'+esc(item.request_id)+'">Ablehnen</button>'
+        :item.status==="approved"
+          ?'<button class="primary-button" data-approval-execute data-approval-id="'+esc(item.request_id)+'">Jetzt ausführen</button>'
+          :"";
+      return '<div class="approval-row"><div class="approval-copy"><b>'+esc(item.action)+'</b><small>'+esc(details)+' · läuft ab '+new Date(item.expires_at*1000).toLocaleTimeString("de-DE")+'</small><span class="approval-status '+esc(item.status)+'">'+esc(approvalStatus(item.status))+'</span></div><div class="approval-controls">'+controls+'</div></div>';
+    }).join("");
+  }catch(err){list.innerHTML='<div class="empty">Freigaben nicht verfügbar: '+esc(err.message)+'</div>'}
+}
+async function refreshExecutions(){
+  const list=$("#execution-list");if(!list)return;
+  try{
+    const data=await api("/api/agent-executions");
+    if(!data.executions.length){list.innerHTML='<div class="empty">Noch keine Agentenausführungen.</div>';return}
+    list.innerHTML=data.executions.map(item=>'<div class="execution-row"><div><b>'+esc(item.agent)+'</b><small>'+new Date(item.created_at*1000).toLocaleString("de-DE")+'</small></div><span class="approval-status '+esc(item.status)+'">'+esc(item.status==="completed"?"ERFOLGREICH":item.status==="failed"?"FEHLGESCHLAGEN":item.status.toUpperCase())+'</span></div>').join("");
+  }catch(err){list.innerHTML='<div class="empty">Ausführungsverlauf nicht verfügbar: '+esc(err.message)+'</div>'}
+}
+async function refreshControlledAgents(){await Promise.all([refreshApprovals(),refreshExecutions()])}
 async function refreshAgentStatus(){const state=$("#ollama-state"),detail=$("#ollama-detail"),button=$('[data-command="agent-refresh"]');if(!state||!detail)return;if(button){button.disabled=true;button.textContent="Prüfe Verbindung …"}try{const d=await api("/api/agent-status");state.textContent=d.available?"ERREICHBAR":"NICHT ERREICHBAR";state.classList.toggle("online",d.available);detail.textContent=d.available?"Ollama-Version "+(d.version||"unbekannt")+" · "+d.endpoint:"Nicht erreichbar · "+d.endpoint}catch(e){state.textContent="STATUS UNBEKANNT";state.classList.remove("online");detail.textContent="Dashboard-Server nicht erreichbar"}finally{if(button){button.disabled=false;button.textContent="Verbindung prüfen"}}}
 async function refreshSystem(){try{const d=await api("/api/system"),m=d.memory;$("#memory-value").textContent=m?m.used_percent+"%":"Nicht verfügbar";$("#memory-bar").style.width=m?m.used_percent+"%":"0%";$("#memory-detail").textContent=m?fmtBytes(m.total_bytes-m.available_bytes)+" von "+fmtBytes(m.total_bytes)+" belegt":"Auf diesem System nicht verfügbar";$("#disk-value").textContent=d.disk.used_percent+"%";$("#disk-bar").style.width=d.disk.used_percent+"%";$("#disk-detail").textContent=fmtBytes(d.disk.free_bytes)+" frei · Home-Speicher";$("#load-value").textContent=d.load_average?d.load_average.map(v=>v.toFixed(2)).join(" / "):"Nicht verfügbar";$("#uptime-value").textContent=fmtDuration(d.uptime_seconds);$("#host-detail").textContent=d.platform+" "+d.release+" · Python "+d.python;$("#telemetry-state").textContent="LIVE"}catch(e){$("#telemetry-state").textContent="OFFLINE"}}
 async function refresh(){try{const data=await api("/api/status");tasks=data.tasks;renderTasks();$("#system-title").textContent="NClaw Dashboard verbunden";$("#system-detail").textContent="Lokale Task Engine erreichbar · "+data.runtime+" · "+data.storage;$("#system-tag").textContent="VERBUNDEN";$("#footer-status").textContent="API verbunden · "+new Date().toLocaleTimeString("de-DE");}catch(e){$("#system-title").textContent="Dashboard-Server nicht erreichbar";$("#system-detail").textContent="Starte das Dashboard mit: python -m dashboard.server";$("#system-tag").textContent="OFFLINE";$("#footer-status").textContent="Keine lokale Verbindung";toast(e.message)}refreshSystem()}
-function navigate(page){if(!names[page])page="overview";$$(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+page));$$(".nav-link").forEach(a=>a.classList.toggle("active",a.dataset.page===page));$("#page-crumb").textContent=names[page];location.hash=page;$("#sidebar").classList.remove("open");if(page==="commands")refreshBackups();if(page==="agents")refreshAgentModels()}
+function navigate(page){if(!names[page])page="overview";$$(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+page));$$(".nav-link").forEach(a=>a.classList.toggle("active",a.dataset.page===page));$("#page-crumb").textContent=names[page];location.hash=page;$("#sidebar").classList.remove("open");if(page==="commands"){refreshBackups();refreshControlledAgents()}if(page==="agents")refreshAgentModels()}
 function openDialog(){$("#task-dialog").showModal();$("#title").focus()}
+$("#agent-action-form").addEventListener("submit",async e=>{
+  e.preventDefault();const button=e.target.querySelector('button[type="submit"]');button.disabled=true;
+  const payload={title:$("#agent-task-title").value,description:$("#agent-task-description").value,priority:Number($("#agent-task-priority").value)};
+  try{const result=await api("/api/agent-actions/propose",{method:"POST",body:JSON.stringify({agent:"task-assistant",payload})});toast("Freigabe angelegt · "+result.approval.request_id);e.target.reset();$("#agent-task-priority").value="3";await refreshControlledAgents();}
+  catch(err){toast("Freigabe konnte nicht angelegt werden: "+err.message)}
+  finally{button.disabled=false}
+});
+$("#inference-form").addEventListener("submit",async e=>{
+  e.preventDefault();const button=e.target.querySelector('button[type="submit"]'),output=$("#inference-output");button.disabled=true;button.textContent="Modell antwortet …";output.textContent="Inferenz läuft. Das Modell erhält nur den Prompt; es werden keine Agentenaktionen gestartet.";
+  try{const result=await api("/api/inference",{method:"POST",body:JSON.stringify({model:$("#inference-model").value,prompt:$("#inference-prompt").value})});output.textContent=result.answer;toast("Modell-Inferenz abgeschlossen");}
+  catch(err){output.textContent="Inferenz fehlgeschlagen: "+err.message;toast(err.message)}
+  finally{button.disabled=false;button.textContent="Modell jetzt ausführen"}
+});
 $("#task-form").addEventListener("submit",async e=>{e.preventDefault();const body={title:$("#title").value,description:$("#description").value,priority:Number($("#priority").value)};try{await api("/api/tasks",{method:"POST",body:JSON.stringify(body)});$("#task-dialog").close();e.target.reset();$("#priority").value="3";await refresh();toast("Aufgabe lokal gespeichert")}catch(err){toast(err.message)}});
 $("#close-dialog").onclick=$("#cancel-dialog").onclick=()=>$("#task-dialog").close();
 $("#new-task").onclick=openDialog;$("#refresh").onclick=refresh;$("#task-filter").onchange=renderTasks;$("#menu-toggle").onclick=()=>$("#sidebar").classList.toggle("open");
-document.addEventListener("click",async e=>{const link=e.target.closest("[data-page]");if(link){e.preventDefault();navigate(link.dataset.page)}const go=e.target.closest("[data-go]");if(go)navigate(go.dataset.go);const cmd=e.target.closest("[data-command]");if(cmd){if(cmd.dataset.command==="create")openDialog();else if(cmd.dataset.command==="backup"){cmd.disabled=true;const label=cmd.querySelector("b");const oldLabel=label.textContent;label.textContent="Sicherung läuft …";try{const result=await api("/api/backup",{method:"POST",body:"{}"});toast("Backup erstellt: "+result.filename);label.textContent="Backup erstellt";await refreshBackups();}catch(err){toast("Backup fehlgeschlagen: "+err.message);label.textContent=oldLabel;}finally{cmd.disabled=false;setTimeout(()=>{label.textContent=oldLabel},2200)}}else if(cmd.dataset.command==="backups-refresh"){refreshBackups()}else if(cmd.dataset.command==="diagnostics-refresh"){refreshDiagnostics()}else if(cmd.dataset.command==="agent-models-refresh"){refreshAgentModels()}else if(cmd.dataset.command==="agent-refresh"){refreshAgentStatus()}else{refresh();toast("Lokale Daten aktualisiert")}}});
+document.addEventListener("click",async e=>{const link=e.target.closest("[data-page]");if(link){e.preventDefault();navigate(link.dataset.page)}const go=e.target.closest("[data-go]");if(go)navigate(go.dataset.go);const decision=e.target.closest("[data-approval-decision]");if(decision){decision.disabled=true;try{await api("/api/approvals/"+encodeURIComponent(decision.dataset.approvalId)+"/decision",{method:"POST",body:JSON.stringify({decision:decision.dataset.approvalDecision})});toast(decision.dataset.approvalDecision==="approve"?"Aktion freigegeben · noch nicht ausgeführt":"Aktion abgelehnt");await refreshControlledAgents()}catch(err){toast(err.message);decision.disabled=false}}
+const execute=e.target.closest("[data-approval-execute]");if(execute){execute.disabled=true;execute.textContent="Ausführung läuft …";try{const result=await api("/api/agent-executions",{method:"POST",body:JSON.stringify({approval_id:execute.dataset.approvalId,agent:"task-assistant"})});toast("Agentenaktion erfolgreich ausgeführt");await refresh();await refreshControlledAgents()}catch(err){toast("Ausführung fehlgeschlagen: "+err.message);await refreshControlledAgents()}}
+const cmd=e.target.closest("[data-command]");if(cmd){if(cmd.dataset.command==="create")openDialog();else if(cmd.dataset.command==="approvals-refresh"||cmd.dataset.command==="executions-refresh"){refreshControlledAgents()}else if(cmd.dataset.command==="backup"){cmd.disabled=true;const label=cmd.querySelector("b");const oldLabel=label.textContent;label.textContent="Sicherung läuft …";try{const result=await api("/api/backup",{method:"POST",body:"{}"});toast("Backup erstellt: "+result.filename);label.textContent="Backup erstellt";await refreshBackups();}catch(err){toast("Backup fehlgeschlagen: "+err.message);label.textContent=oldLabel;}finally{cmd.disabled=false;setTimeout(()=>{label.textContent=oldLabel},2200)}}else if(cmd.dataset.command==="backups-refresh"){refreshBackups()}else if(cmd.dataset.command==="diagnostics-refresh"){refreshDiagnostics()}else if(cmd.dataset.command==="agent-models-refresh"){refreshAgentModels()}else if(cmd.dataset.command==="agent-refresh"){refreshAgentStatus()}else{refresh();toast("Lokale Daten aktualisiert")}}});
 document.addEventListener("change",async e=>{const sel=e.target.closest("[data-task]");if(!sel||!sel.value)return;try{await api("/api/tasks/"+encodeURIComponent(sel.dataset.task)+"/status",{method:"POST",body:JSON.stringify({status:sel.value,note:"Status über Dashboard geändert"})});await refresh();toast("Aufgabenstatus aktualisiert")}catch(err){toast(err.message);sel.value=""}});
-window.addEventListener("hashchange",()=>navigate(location.hash.slice(1)));$("#today").textContent=new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"2-digit",month:"long"}).format(new Date()).toUpperCase();navigate(location.hash.slice(1)||"overview");refresh();refreshAgentStatus();refreshAgentModels();setInterval(refreshSystem,10000);setInterval(refreshAgentStatus,15000);
+window.addEventListener("hashchange",()=>navigate(location.hash.slice(1)));$("#today").textContent=new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"2-digit",month:"long"}).format(new Date()).toUpperCase();navigate(location.hash.slice(1)||"overview");refresh();refreshAgentStatus();refreshAgentModels();refreshControlledAgents();setInterval(refreshSystem,10000);setInterval(refreshAgentStatus,15000);
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
