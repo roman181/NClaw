@@ -52,6 +52,11 @@ def test_dashboard_serves_ui_and_local_task_api(tmp_path: Path, monkeypatch):
         with urlopen(base + "/api/status", timeout=3) as response:
             status = json.loads(response.read())
             assert status["counts"]["queued"] == 1
+
+        with urlopen(base + "/app.js", timeout=3) as response:
+            app_script = response.read().decode("utf-8")
+            assert "async function renderActivity()" in app_script
+            assert '"/api/tasks/"+encodeURIComponent(task.id)+"/history"' in app_script
     finally:
         server.shutdown()
         server.server_close()
