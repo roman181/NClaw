@@ -8,6 +8,9 @@ from .agent import SandmannAgent
 
 
 def main() -> None:
+    from dotenv import load_dotenv
+
+    load_dotenv()
     parser = argparse.ArgumentParser(description="NClaw Sandmann – sichere lokale Dateianalyse")
     sub = parser.add_subparsers(dest="command", required=True)
     intake = sub.add_parser("import", help="Datei in incoming oder quarantine kopieren")
