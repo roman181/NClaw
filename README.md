@@ -90,10 +90,7 @@ flowchart TD
     N <--> S["📂 Sandmann"]
     N <--> A["Llama via Ollama"]
 
-    A <--> D["Modell-Debatte"]
-    B <--> D
-
-    D --> X["Antwortprüfung durch Llama"]
+    A --> X["Antwortprüfung durch Llama"]
 
     S --> SB["Sandbox-Ai"]
     SB --> L["Lokale Bibliothek"]
@@ -112,7 +109,7 @@ Komponenten
 - Telegram-Agent: Kommunikation und Freigaben.
 - Sandmann: Dateiverarbeitung und Bibliotheksverwaltung.
 - Llama: Einziges lokales KI-Modell für Analyse und Antworten.
-- TokenGuard: Modellwechsel und Kontextübergabe.
+- TokenGuard: Kontextüberwachung und JSON-Übergabe.
 - Skill-Baum: Visualisierung der Fähigkeiten.
 - Sandbox-Ai: Isolierte Prüfung unbekannter Daten und Skills.
 
@@ -460,6 +457,30 @@ Die IP-Adresse muss durch die tatsächliche LAN-Adresse ersetzt werden.
 
 Niemals die echte ".env"-Datei auf GitHub hochladen.
 
+
+### Telegram-Agent starten
+
+1. Erstelle über den offiziellen BotFather einen Telegram-Bot und kopiere dessen Bot-Token.
+2. Ermittle deine numerische Telegram-Chat-ID über einen vertrauenswürdigen Weg.
+3. Trage beide Werte ausschließlich in die lokale `.env`-Datei ein:
+
+```env
+TELEGRAM_BOT_TOKEN=dein_bot_token
+TELEGRAM_CHAT_ID=deine_numerische_chat_id
+```
+
+4. Starte den Agenten:
+
+```bash
+python -m agents.telegram.bot
+```
+
+Verfügbare Telegram-Befehle: `/help`, `/status` und `/ask Deine Frage`.
+Der Bot akzeptiert ausschließlich Nachrichten von der konfigurierten Chat-ID.
+Er führt keine Shell-Befehle aus und besitzt in dieser ersten Version keine
+Freigabe- oder Dateiänderungsfunktion. Für den Betrieb muss der Rechner mit
+Ollama erreichbar sein. Beende den Polling-Prozess mit Ctrl+C.
+
 ---
 
 📁 13. Projektstruktur
@@ -479,6 +500,11 @@ nclaw/
 │   ├── ISSUE_TEMPLATE/
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── dependabot.yml
+│
+├── agents/
+│   └── telegram/
+│       ├── __init__.py
+│       └── bot.py
 │
 ├── core/
 │   ├── __init__.py
@@ -532,6 +558,8 @@ nclaw/
 │   └── settings.py
 │
 ├── tests/
+│   ├── test_core.py
+│   └── test_telegram.py
 │
 ├── .env.example
 ├── .gitignore
@@ -590,7 +618,7 @@ Phase 1 – Grundsystem
 
 Phase 2 – Agenten
 
-- [ ] Telegram-Agent
+- [x] Telegram-Agent (sichere Basis: Allowlist, /ask, /status, /help)
 - [ ] Sandmann-Agent
 - [ ] Agentenverwaltung
 - [ ] Freigabesystem
