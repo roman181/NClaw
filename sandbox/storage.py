@@ -64,8 +64,11 @@ class LocalSandbox:
                 "sha256": digest.hexdigest(), "status": "incoming" if trusted_type else "quarantine"}
 
     def move_to(self, source: str | Path, destination: str) -> Path:
-        source_path = Path(source).resolve(strict=True)
-        if not source_path.is_relative_to(self.root) or source_path.is_symlink() or not source_path.is_file():
+        candidate = Path(source)
+        if candidate.is_symlink():
+            raise ValueError("Symbolic links are not accepted")
+        source_path = candidate.resolve(strict=True)
+        if not source_path.is_relative_to(self.root) or not source_path.is_file():
             raise ValueError("Source must be a regular file inside the sandbox")
         target_folder = self.folder(destination)
         target = target_folder / source_path.name
