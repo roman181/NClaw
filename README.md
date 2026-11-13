@@ -477,9 +477,7 @@ python -m agents.telegram.bot
 
 Verfügbare Telegram-Befehle: `/help`, `/status` und `/ask Deine Frage`.
 Der Bot akzeptiert ausschließlich Nachrichten von der konfigurierten Chat-ID.
-Er führt keine Shell-Befehle aus und besitzt in dieser ersten Version keine
-Freigabe- oder Dateiänderungsfunktion. Für den Betrieb muss der Rechner mit
-Ollama erreichbar sein. Beende den Polling-Prozess mit Ctrl+C.
+Er führt keine Shell-Befehle aus. Freigaben können mit `/request AKTION | DETAILS` angelegt und mit `/approve ID` oder `/deny ID` entschieden werden. `/pending` zeigt offene Anfragen. Eine Zustimmung protokolliert nur die Freigabe und führt noch keine Aktion aus. Freigaben verfallen nach 10 Minuten, gelten nur einmal und werden beim Neustart verworfen. Ein späterer Aktions-Handler muss `ApprovalManager.consume()` unmittelbar vor der Aktion aufrufen. Für den Betrieb muss der Rechner mit Ollama erreichbar sein. Beende den Polling-Prozess mit Ctrl+C.
 
 ---
 
@@ -621,7 +619,7 @@ Phase 2 – Agenten
 - [x] Telegram-Agent (sichere Basis: Allowlist, /ask, /status, /help)
 - [ ] Sandmann-Agent
 - [ ] Agentenverwaltung
-- [ ] Freigabesystem
+- [x] Telegram-Freigabe-Basis (Ablaufzeit, Einmalfreigabe, Aktionsbindung; noch keine Aktionsausführung)
 - [ ] Aufgabenverwaltung
 
 Phase 3 – Bibliothek
