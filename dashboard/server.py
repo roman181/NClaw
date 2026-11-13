@@ -71,10 +71,10 @@ class DashboardHandler(BaseHTTPRequestHandler):
             raise ValueError("Request body missing or too large")
         value = json.loads(self.rfile.read(length))
         if not isinstance(value, dict):
-            raise ValueError("JSON object required")
+            raise TypeError("JSON object required")
         return value
 
-    def do_GET(self) -> None:  # noqa: N802
+    def do_GET(self) -> None:
         path = urlparse(self.path).path
         if path == "/api/status":
             tasks = STORE.list(limit=200)
