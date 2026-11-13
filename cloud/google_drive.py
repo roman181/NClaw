@@ -51,7 +51,7 @@ class GoogleDriveStorage:
         return build("drive", "v3", credentials=credentials, cache_discovery=False)
 
     def _folder_id(self, service) -> str:
-        escaped = self.folder_name.replace("'", "\\\\'")
+        escaped = self.folder_name.replace("'", "\\'")
         response = service.files().list(q=f"mimeType='application/vnd.google-apps.folder' and name='{escaped}' and trashed=false",
                                         spaces="drive", fields="files(id,name)", pageSize=10).execute()
         if response.get("files"):
@@ -65,8 +65,11 @@ class GoogleDriveStorage:
         candidate = Path(file_path).expanduser()
         if candidate.is_symlink():
             raise ValueError("Symbolische Links dürfen nicht hochgeladen werden")
+        approved_candidate = self.root / "approved"
+        if approved_candidate.is_symlink():
+            raise ValueError("Der approved-Ordner darf kein symbolischer Link sein")
         path = candidate.resolve(strict=True)
-        approved = (self.root / "approved").resolve(strict=True)
+        approved = approved_candidate.resolve(strict=True)
         if not path.is_relative_to(approved) or not path.is_file():
             raise ValueError("Nur reguläre Dateien aus dem Ordner approved dürfen hochgeladen werden")
         service = self._service()
