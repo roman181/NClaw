@@ -8,10 +8,10 @@ from __future__ import annotations
 import os
 import sqlite3
 import uuid
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from collections.abc import Iterator
 
 STATUSES = {"queued", "in_progress", "blocked", "completed", "failed", "cancelled"}
 TRANSITIONS = {
