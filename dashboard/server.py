@@ -10,7 +10,7 @@ import json
 import os
 import platform
 import shutil
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -229,7 +229,7 @@ class DashboardHandler(BaseHTTPRequestHandler):
             payload = self._body()
             if path == "/api/backup":
                 backup_dir = STORE.path.parent / "backups"
-                stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+                stamp = datetime.now(timezone.utc)  # noqa: UP017 - keep Python 3.10 compatibility.strftime("%Y%m%dT%H%M%S%fZ")
                 backup_path = STORE.backup(backup_dir / f"tasks-{stamp}.sqlite3")
                 self._json(201, {"ok": True, "filename": backup_path.name})
                 return
