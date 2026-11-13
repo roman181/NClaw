@@ -20,3 +20,11 @@ $("#new-task").onclick=openDialog;$("#refresh").onclick=refresh;$("#task-filter"
 document.addEventListener("click",e=>{const link=e.target.closest("[data-page]");if(link){e.preventDefault();navigate(link.dataset.page)}const go=e.target.closest("[data-go]");if(go)navigate(go.dataset.go);const cmd=e.target.closest("[data-command]");if(cmd){if(cmd.dataset.command==="create")openDialog();else{refresh();toast("Lokale Daten aktualisiert")}}});
 document.addEventListener("change",async e=>{const sel=e.target.closest("[data-task]");if(!sel||!sel.value)return;try{await api("/api/tasks/"+encodeURIComponent(sel.dataset.task)+"/status",{method:"POST",body:JSON.stringify({status:sel.value,note:"Status über Dashboard geändert"})});await refresh();toast("Aufgabenstatus aktualisiert")}catch(err){toast(err.message);sel.value=""}});
 window.addEventListener("hashchange",()=>navigate(location.hash.slice(1)));$("#today").textContent=new Intl.DateTimeFormat("de-DE",{weekday:"long",day:"2-digit",month:"long"}).format(new Date()).toUpperCase();navigate(location.hash.slice(1)||"overview");refresh();setInterval(refreshSystem,10000);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
+      // Offline caching is optional; the dashboard remains usable online.
+    });
+  });
+}
