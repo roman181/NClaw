@@ -70,8 +70,15 @@ class ApprovalManager:
         return record
 
     def consume(self, request_id: str, expected_action: str) -> ApprovalRecord:
-        """Consume a matching approval once, immediately before an action."""
-        record = self._get_pending(request_id)
+        """Consume a matching approved request exactly once before an action."""
+        record = self._records.get(request_id)
+        if record is None:
+            raise KeyError("Approval request not found")
+        if record.status != "approved":
+            raise PermissionError("Request has not been approved")
+        if time.time() >= record.expires_at:
+            record.status = "expired"
+            raise TimeoutError("Approval request expired")
         if record.action != expected_action:
             raise PermissionError("Approval does not match the requested action")
         record.status = "consumed"
