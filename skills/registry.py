@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SKILL_ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
-SEMVER = re.compile(r"^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$")
+SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 MAX_INSTRUCTIONS = 20_000
 
 
@@ -44,7 +44,7 @@ class SkillRegistry:
         try:
             with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
                 json.dump(payload, stream, ensure_ascii=False, indent=2)
-                stream.write("\\n")
+                stream.write("\n")
             temporary.replace(path)
         finally:
             if temporary.exists():
@@ -66,10 +66,16 @@ class SkillRegistry:
             raise ValueError("Skill-Anweisungen müssen 1 bis 20000 Zeichen lang sein")
         if not source.strip() or len(source) > 200:
             raise ValueError("Ungültige Quellenangabe")
+        library_root = self.root / "library"
+        if library_root.is_symlink():
+            raise ValueError("Skill-Bibliothek darf kein symbolischer Link sein")
+        library_root.mkdir(parents=True, exist_ok=True, mode=0o700)
+        if not library_root.resolve().is_relative_to(self.root):
+            raise ValueError("Skill-Bibliothek liegt außerhalb des lokalen Datenordners")
         if self.directory.is_symlink():
             raise ValueError("Skill-Bibliothek darf kein symbolischer Link sein")
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-        if not self.directory.resolve().is_relative_to(self.root):
+        if not self.directory.resolve().is_relative_to(library_root.resolve()):
             raise ValueError("Skill-Bibliothek liegt außerhalb des lokalen Datenordners")
         target = self._skill_path(skill_id, version)
         target.parent.mkdir(mode=0o700, exist_ok=True)
