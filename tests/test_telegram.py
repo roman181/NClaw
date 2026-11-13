@@ -77,3 +77,24 @@ def test_telegram_client_sends_bot_api_request() -> None:
     assert requests[0].url.path.endswith("/sendMessage")
     assert requests[0].read() == b'{"chat_id":"123","text":"Test"}'
     http.close()
+
+
+
+def test_request_creates_pending_approval() -> None:
+    telegram = FakeTelegram()
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama())  # type: ignore[arg-type]
+    agent.handle_update(make_update(123, "/request publish | Release v0.1"))
+    assert "Freigabe angelegt" in telegram.sent[-1][1]
+    assert "führt selbst noch nichts aus" in telegram.sent[-1][1]
+    assert len(agent.approvals.pending()) == 1
+
+
+def test_approve_and_deny_commands_are_allowlisted() -> None:
+    telegram = FakeTelegram()
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama())  # type: ignore[arg-type]
+    request = agent.approvals.create("publish", "Release v0.1")
+    agent.handle_update(make_update(999, f"/approve {request.request_id}"))
+    assert request.status == "pending"
+    agent.handle_update(make_update(123, f"/approve {request.request_id}"))
+    assert request.status == "approved"
+    assert "keine Aktion ausgeführt" in telegram.sent[-1][1]
