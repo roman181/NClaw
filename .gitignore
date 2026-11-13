@@ -9,3 +9,10 @@ dist/
 build/
 *.egg-info/
 .DS_Store
+
+# NClaw local data, OAuth credentials and Drive tokens
+.nclaw/
+workspace/
+google-oauth-client.json
+google-drive-token.json
+*.token.json
