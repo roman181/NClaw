@@ -93,6 +93,39 @@ def ollama_status() -> dict[str, object]:
         }
 
 
+def ollama_models() -> dict[str, object]:
+    """List locally available Ollama model metadata; never loads or runs a model."""
+    status = ollama_status()
+    if not status.get("available"):
+        return {"ok": True, "available": False, "models": [], "endpoint": status.get("endpoint")}
+    configured_host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").strip()
+    parsed = urlsplit(configured_host)
+    base_url = urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+    request = Request(
+        f"{base_url}/api/tags",
+        headers={"Accept": "application/json"},
+        method="GET",
+    )
+    try:
+        opener = build_opener(_NoRedirect())
+        with opener.open(request, timeout=1.0) as response:
+            payload = json.loads(response.read(32_768))
+        raw_models = payload.get("models", []) if isinstance(payload, dict) else []
+        models = []
+        if isinstance(raw_models, list):
+            for item in raw_models[:50]:
+                if not isinstance(item, dict) or not isinstance(item.get("name"), str):
+                    continue
+                models.append({
+                    "name": item["name"][:160],
+                    "size": item.get("size") if isinstance(item.get("size"), int) else None,
+                    "modified_at": item.get("modified_at") if isinstance(item.get("modified_at"), str) else None,
+                })
+        return {"ok": True, "available": True, "models": models, "endpoint": status.get("endpoint")}
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError):
+        return {"ok": True, "available": True, "models": [], "error": "Modellliste momentan nicht lesbar", "endpoint": status.get("endpoint")}
+
+
 def system_metrics() -> dict[str, object]:
     """Return best-effort, read-only host metrics without optional dependencies."""
     memory = None
@@ -163,6 +196,9 @@ class DashboardHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/agent-status":
             self._json(200, ollama_status())
+            return
+        if path == "/api/agent-models":
+            self._json(200, ollama_models())
             return
         if path == "/api/tasks":
             self._json(200, {"tasks": STORE.list(limit=200)})
