@@ -1019,3 +1019,28 @@ models/ollama.py ist der getrennte Ollama-Transport. Er akzeptiert nur Loopback-
 ### Tests und Grenzen
 
 Die Tests liegen in tests/test_agent_runtime.py, tests/test_approval_manager.py und tests/test_llama.py. Sie prüfen Freigabezwang, einmalige Nutzung, Payload-Bindung, unbekannte Agenten, Eingabegrenzen, Fehlerzustände, private Ollama-Ziele und Redirect-Schutz. Ein erfolgreicher Test mit Mock-Transport beweist nicht, dass ein echtes Ollama-Modell installiert oder verfügbar ist. Die Inferenz benötigt einen separat gestarteten und erreichbaren Ollama-Dienst.
+
+
+---
+
+## 🧭 23. Dashboard: Freigaben, Agentenlauf und Modell-Inferenz
+
+Die Kommandozentrale verbindet jetzt drei getrennte, lokal kontrollierte Abläufe:
+
+### Agentenaktion und Freigabe
+
+1. In der Kommandozentrale kann ausschließlich die registrierte Aktion `task-assistant` vorgeschlagen werden. Sie erstellt eine lokale Aufgabe.
+2. Der Vorschlag wird als `pending` in der Freigabeverwaltung angezeigt. Vor der Freigabe wird nichts ausgeführt.
+3. Die Schaltfläche **Freigeben** autorisiert nur genau diese Aktion und den unveränderten JSON-Inhalt. **Ablehnen** beendet den Vorschlag.
+4. Erst ein zusätzlicher Klick auf **Jetzt ausführen** konsumiert die Freigabe einmalig und legt die Aufgabe an.
+5. Freigaben verfallen nach zehn Minuten. Die Registry ist im Arbeitsspeicher; beim Serverneustart werden offene Freigaben verworfen.
+
+Die API-Endpunkte sind `GET /api/approvals`, `POST /api/agent-actions/propose`, `POST /api/approvals/{id}/decision`, `POST /api/agent-executions` und `GET /api/agent-executions`. Die Registry schützt Freigabeänderungen und einmaligen Verbrauch mit einem Lock. Es gibt keine Shell-, dynamische Code- oder freie Funktionsausführung.
+
+### Modell-Inferenz (separat)
+
+Im Bereich **Agenten** kann ein installiertes Ollama-Modell ausgewählt und mit einem Prompt ausdrücklich gestartet werden. Der Server prüft, dass das Modell in der lokalen Ollama-Inventarliste steht, und verwendet den begrenzten `OllamaClient`. Diese Inferenz startet keine Agentenaktion, konsumiert keine Freigabe und gewährt dem Modell keine Werkzeugrechte. Ein Modelltext führt niemals automatisch zu einer Aktion.
+
+### Tests und Statusgrenzen
+
+`tests/test_agent_dashboard.py` prüft den vollständigen Ablauf (Vorschlag, fehlende Freigabe, Freigabe, separate Ausführung, einmalige Nutzung), Ablehnung, Eingabe-Allowlist, getrennte Inferenz und die UI-Kontrollen. Inferenz wird nur durch expliziten Formularaufruf gestartet. Die Ausführungs- und Freigabeverläufe sind bis zu einem Serverneustart verfügbar; sie sind keine persistente Audit-Datenbank.
