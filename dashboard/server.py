@@ -234,6 +234,66 @@ def system_metrics() -> dict[str, object]:
 class DashboardHandler(BaseHTTPRequestHandler):
     server_version = "NClawDashboard/1.0"
 
+    def _local_authority(self, authority: str) -> tuple[str, int] | None:
+        """Return a validated loopback authority on this server's HTTP port."""
+        try:
+            parsed = urlsplit("//" + authority)
+            hostname = parsed.hostname
+            port = parsed.port if parsed.port is not None else 80
+            if (
+                not hostname
+                or parsed.username is not None
+                or parsed.password is not None
+                or parsed.path
+                or parsed.query
+                or parsed.fragment
+                or port != self.server.server_port
+            ):
+                return None
+            try:
+                is_loopback = ipaddress.ip_address(hostname).is_loopback
+            except ValueError:
+                is_loopback = hostname.lower() == "localhost"
+            if not is_loopback:
+                return None
+            return hostname.lower(), port
+        except ValueError:
+            return None
+
+    def _reject_untrusted_request(self) -> bool:
+        """Block DNS-rebinding Host headers and cross-origin browser writes."""
+        host_authority = self._local_authority(self.headers.get("Host", ""))
+        if host_authority is None:
+            self._json(421, {"error": "Local dashboard Host header required"})
+            return True
+
+        if self.command in {"POST", "OPTIONS"}:
+            fetch_site = self.headers.get("Sec-Fetch-Site", "").lower()
+            if fetch_site and fetch_site not in {"same-origin", "none"}:
+                self._json(403, {"error": "Cross-origin requests are not allowed"})
+                return True
+
+            origin = self.headers.get("Origin")
+            if origin:
+                try:
+                    parsed_origin = urlsplit(origin)
+                    origin_authority = self._local_authority(parsed_origin.netloc)
+                    valid_origin = (
+                        parsed_origin.scheme == "http"
+                        and parsed_origin.path in {"", "/"}
+                        and not parsed_origin.query
+                        and not parsed_origin.fragment
+                        and parsed_origin.username is None
+                        and parsed_origin.password is None
+                        and origin_authority == host_authority
+                    )
+                except ValueError:
+                    valid_origin = False
+                if not valid_origin:
+                    self._json(403, {"error": "Cross-origin requests are not allowed"})
+                    return True
+        return False
+
     def log_message(self, fmt: str, *args: object) -> None:
         # Avoid writing task titles or request bodies to logs.
         print(f"[NClaw Dashboard] {self.address_string()} {self.command} {self.path.split('?')[0]}")
@@ -258,6 +318,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         return value
 
     def do_GET(self) -> None:
+        if self._reject_untrusted_request():
+            return
         path = urlparse(self.path).path
         if path == "/api/status":
             tasks = STORE.list(limit=200)
@@ -344,6 +406,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
         self.wfile.write(content)
 
     def do_POST(self) -> None:
+        if self._reject_untrusted_request():
+            return
         if self.client_address[0] not in {"127.0.0.1", "::1"}:
             self._json(403, {"error": "Local access only"})
             return
@@ -423,6 +487,8 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json(400, {"error": str(exc)})
 
     def do_OPTIONS(self) -> None:
+        if self._reject_untrusted_request():
+            return
         self._json(405, {"error": "Method not allowed"})
 
 
