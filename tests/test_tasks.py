@@ -51,3 +51,39 @@ def test_priority_order_and_status_filter(tmp_path: Path):
     urgent = store.create("Urgent", priority=1)
     assert store.list()[0]["id"] == urgent["id"]
     assert len(store.list(status="queued")) == 2
+
+
+def test_backup_preserves_tasks_and_events_without_overwrite(tmp_path: Path):
+    store = TaskStore(tmp_path / "data" / "tasks.sqlite3")
+    task = store.create("Backup me")
+    store.transition(str(task["id"]), "in_progress", "Backup event")
+
+    backup_path = store.backup(tmp_path / "backups" / "tasks-copy.sqlite3")
+    restored_view = TaskStore(backup_path)
+    assert restored_view.get(str(task["id"]))["status"] == "in_progress"
+    assert [event["note"] for event in restored_view.history(str(task["id"]))] == [
+        "Task created", "Backup event"
+    ]
+    with pytest.raises(FileExistsError):
+        store.backup(backup_path)
+
+
+def test_backup_rejects_database_path_and_symlink(tmp_path: Path):
+    store = TaskStore(tmp_path / "tasks.sqlite3")
+    with pytest.raises(ValueError):
+        store.backup(store.path)
+
+    existing = tmp_path / "existing.sqlite3"
+    existing.write_text("keep", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        store.backup(existing)
+    assert existing.read_text(encoding="utf-8") == "keep"
+
+    if hasattr(__import__("os"), "symlink"):
+        link = tmp_path / "backup-link.sqlite3"
+        try:
+            link.symlink_to(existing)
+        except OSError:
+            return
+        with pytest.raises(ValueError):
+            store.backup(link)
