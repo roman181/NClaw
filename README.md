@@ -687,7 +687,7 @@ Security
 
 Releases
 
-Neue Versionen werden über Git-Tags veröffentlicht.
+Neue Versionen werden ausschließlich über Git-Tags im Format `v*` veröffentlicht. Der Release-Workflow startet nicht manuell, damit kein Release ohne gültigen Tag angelegt wird.
 
 Beispiel:
 
