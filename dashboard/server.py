@@ -17,12 +17,86 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from core.agent_runtime import AgentExecutionError, AgentRuntime
+from models.llama import LlamaModel
+from models.ollama import OllamaClient, OllamaError
 from tasks.store import STATUSES, TaskStore
 
 HOST = "127.0.0.1"
 PORT = int(os.getenv("NCLAW_DASHBOARD_PORT", "8765"))
 WEB_ROOT = Path(__file__).resolve().parent / "static"
 STORE = TaskStore()
+
+
+def _validate_task_payload(payload: dict[str, object]) -> tuple[str, str, int]:
+    allowed = {"title", "description", "priority"}
+    if set(payload) - allowed:
+        raise ValueError("Unknown task action fields")
+    title = payload.get("title")
+    description = payload.get("description", "")
+    priority = payload.get("priority", 3)
+    if not isinstance(title, str) or not title.strip() or len(title) > 200:
+        raise ValueError("Task title must contain 1 to 200 characters")
+    if not isinstance(description, str) or len(description) > 5000:
+        raise ValueError("Task description must not exceed 5000 characters")
+    if type(priority) is not int or not 1 <= priority <= 5:
+        raise ValueError("Task priority must be an integer from 1 to 5")
+    return title.strip(), description, priority
+
+
+def _create_task_action(payload: dict[str, object]) -> dict[str, object]:
+    """The sole dashboard agent action: create one validated local task."""
+    title, description, priority = _validate_task_payload(payload)
+    return STORE.create(title, description, priority)
+
+
+RUNTIME = AgentRuntime()
+RUNTIME.register("task-assistant", _create_task_action)
+
+
+def _approval_json(record) -> dict[str, object]:
+    item: dict[str, object] = {
+        "request_id": record.request_id,
+        "action": record.action,
+        "description": record.description,
+        "status": record.status,
+        "created_at": record.created_at,
+        "expires_at": record.expires_at,
+    }
+    if record.status in {"pending", "approved"}:
+        try:
+            item["payload"] = RUNTIME.payload_for(record.request_id)
+        except KeyError:
+            pass
+    return item
+
+
+def _execution_json(record) -> dict[str, object]:
+    return {
+        "execution_id": record.execution_id,
+        "agent": record.agent,
+        "approval_id": record.approval_id,
+        "status": record.status,
+        "created_at": record.created_at,
+        "finished_at": record.finished_at,
+        "error": record.error,
+    }
+
+
+def run_model_inference(model: str, prompt: str) -> str:
+    """Run one explicit inference using an installed local Ollama model."""
+    if not isinstance(model, str) or not model.strip() or len(model) > 120:
+        raise ValueError("A valid installed model name is required")
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > 16_000:
+        raise ValueError("Prompt must contain 1 to 16000 characters")
+    inventory = ollama_models()
+    installed = {
+        item["name"] for item in inventory.get("models", [])
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    if not inventory.get("available") or model not in installed:
+        raise ValueError("Selected model is not available in the local Ollama inventory")
+    return LlamaModel(client=OllamaClient(timeout=60), model=model).generate(prompt)
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -200,6 +274,19 @@ class DashboardHandler(BaseHTTPRequestHandler):
         if path == "/api/agent-models":
             self._json(200, ollama_models())
             return
+        if path == "/api/approvals":
+            self._json(200, {"approvals": [
+                _approval_json(record) for record in RUNTIME.approvals.list(limit=50)
+            ]})
+            return
+        if path == "/api/agent-executions":
+            records = sorted(
+                RUNTIME.executions.values(),
+                key=lambda record: record.created_at,
+                reverse=True,
+            )[:50]
+            self._json(200, {"executions": [_execution_json(record) for record in records]})
+            return
         if path == "/api/tasks":
             self._json(200, {"tasks": STORE.list(limit=200)})
             return
@@ -263,6 +350,40 @@ class DashboardHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             payload = self._body()
+            if path == "/api/agent-actions/propose":
+                agent = payload.get("agent")
+                action_payload = payload.get("payload")
+                if agent != "task-assistant" or not isinstance(action_payload, dict):
+                    raise ValueError("Only the registered task-assistant action is available")
+                _validate_task_payload(action_payload)
+                approval = RUNTIME.propose(agent, action_payload)
+                self._json(201, {"approval": _approval_json(approval)})
+                return
+            if path.startswith("/api/approvals/") and path.endswith("/decision"):
+                request_id = path[len("/api/approvals/"):-len("/decision")].strip("/")
+                decision = payload.get("decision")
+                if not request_id or decision not in {"approve", "reject"}:
+                    raise ValueError("A valid approval ID and decision are required")
+                record = (
+                    RUNTIME.approvals.approve(request_id)
+                    if decision == "approve"
+                    else RUNTIME.approvals.reject(request_id)
+                )
+                self._json(200, {"approval": _approval_json(record)})
+                return
+            if path == "/api/agent-executions":
+                approval_id = payload.get("approval_id")
+                agent = payload.get("agent")
+                if not isinstance(approval_id, str) or agent != "task-assistant":
+                    raise ValueError("Approval ID and registered agent are required")
+                record, result = RUNTIME.execute(approval_id, agent)
+                self._json(200, {"execution": _execution_json(record), "result": result})
+                return
+            if path == "/api/inference":
+                model, prompt = payload.get("model"), payload.get("prompt")
+                answer = run_model_inference(model, prompt)
+                self._json(200, {"ok": True, "model": model, "answer": answer})
+                return
             if path == "/api/backup":
                 backup_dir = STORE.path.parent / "backups"
                 stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")  # noqa: UP017 - keep Python 3.10 compatibility
@@ -290,6 +411,14 @@ class DashboardHandler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Route not found"})
         except KeyError as exc:
             self._json(404, {"error": str(exc)})
+        except PermissionError as exc:
+            self._json(403, {"error": str(exc)})
+        except TimeoutError as exc:
+            self._json(410, {"error": str(exc)})
+        except AgentExecutionError as exc:
+            self._json(422, {"error": str(exc)})
+        except OllamaError as exc:
+            self._json(502, {"error": str(exc)})
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._json(400, {"error": str(exc)})
 
