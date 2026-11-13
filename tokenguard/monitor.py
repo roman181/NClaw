@@ -40,12 +40,12 @@ class TokenGuard:
         if not text:
             return 0
         byte_estimate = math.ceil(len(text.encode("utf-8")) / 4)
-        lexical_units = re.findall(r"\\w+|[^\\w\\s]", text, flags=re.UNICODE)
+        lexical_units = re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE)
         lexical_estimate = math.ceil(len(lexical_units) * 1.3)
         return max(byte_estimate, lexical_estimate)
 
     def check(self, prompt: str, system: str | None = None) -> TokenCheck:
-        combined = f"{system or ''}\\n{prompt}"
+        combined = f"{system or ''}\n{prompt}"
         return TokenCheck(
             estimated_tokens=self.estimate_tokens(combined),
             context_window=self.context_window,
