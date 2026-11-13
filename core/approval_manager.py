@@ -104,6 +104,15 @@ class ApprovalManager:
             record.status = "consumed"
             return record
 
+    def get(self, request_id: str) -> ApprovalRecord:
+        with self._lock:
+            record = self._records.get(request_id)
+            if record is None:
+                raise KeyError("Approval request not found")
+            if record.status in {"pending", "approved"} and time.time() >= record.expires_at:
+                record.status = "expired"
+            return record
+
     def pending(self) -> list[ApprovalRecord]:
         return [record for record in self.list() if record.status == "pending"]
 
