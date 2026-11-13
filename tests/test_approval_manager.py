@@ -30,6 +30,15 @@ def test_approved_request_is_one_time_and_action_bound() -> None:
         manager.consume(request.request_id, "publish")
 
 
+def test_approval_is_bound_to_exact_payload() -> None:
+    manager = ApprovalManager()
+    request = manager.create("file.create", "Create notes.txt", binding="digest-a")
+    manager.approve(request.request_id)
+    with pytest.raises(PermissionError):
+        manager.consume(request.request_id, "file.create", "digest-b")
+    assert manager.consume(request.request_id, "file.create", "digest-a").status == "consumed"
+
+
 def test_expired_request_cannot_be_approved() -> None:
     manager = ApprovalManager(ttl_seconds=1)
     request = manager.create("install", "Install package")
