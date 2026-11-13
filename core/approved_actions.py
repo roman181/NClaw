@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import os
 from pathlib import Path, PurePosixPath
+from typing import ClassVar
 
 
 class ApprovedFileWriter:
     """Create new UTF-8 files beneath one workspace; never overwrite files."""
 
-    BLOCKED_PARTS = {".git", ".venv", "__pycache__", "node_modules"}
-    BLOCKED_NAMES = {".env", ".env.local", ".env.production"}
+    BLOCKED_PARTS: ClassVar[set[str]] = {".git", ".venv", "__pycache__", "node_modules"}
+    BLOCKED_NAMES: ClassVar[set[str]] = {".env", ".env.local", ".env.production"}
 
     def __init__(self, workspace: str | Path) -> None:
         root = Path(workspace).expanduser()
@@ -24,7 +25,7 @@ class ApprovedFileWriter:
         if "\\" in relative_path:
             raise ValueError("Backslashes are not allowed in workspace paths")
         rel = PurePosixPath(relative_path)
-        if rel.is_absolute() or any(part in {"", ".", ".."} for part in rel.parts):
+        if not rel.parts or rel.is_absolute() or any(part in {"", ".", ".."} for part in rel.parts):
             raise ValueError("Path must stay inside the workspace")
         if any(part in self.BLOCKED_PARTS for part in rel.parts):
             raise ValueError("This workspace path is protected")
@@ -47,7 +48,7 @@ class ApprovedFileWriter:
 
     def create_new(self, relative_path: str, content: str) -> Path:
         if not isinstance(content, str):
-            raise ValueError("File content must be text")
+            raise TypeError("File content must be text")
         target = self.validate_path(relative_path)
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
         flags |= getattr(os, "O_NOFOLLOW", 0)
@@ -57,7 +58,7 @@ class ApprovedFileWriter:
                 stream.write(content)
                 stream.flush()
                 os.fsync(stream.fileno())
-        except Exception:
+        except (OSError, UnicodeError):
             try:
                 target.unlink(missing_ok=True)
             finally:
