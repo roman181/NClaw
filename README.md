@@ -987,3 +987,35 @@ Die Installation benötigt keine Cloud, keinen externen Dienst und keine zusätz
 Im Bereich **Agenten** zeigt NClaw, ob Ollama erreichbar ist. Standardmäßig wird `http://127.0.0.1:11434` geprüft. Für einen Ollama-Rechner im privaten LAN kannst du vor dem Start des Dashboards `export OLLAMA_HOST=http://192.168.1.50:11434` setzen (IP und Port anpassen). Erlaubt sind Loopback-Adressen, private IP-Adressen und `.local`-Hostnamen; öffentliche Hosts, URL-Zugangsdaten und Weiterleitungen werden abgewiesen. Die Verbindungsprüfung fragt ausschließlich `GET /api/version` mit kurzem Timeout ab. Die Modellübersicht liest zusätzlich über `GET /api/tags` maximal 50 Modell-Metadatensätze (Name, Größe und Änderungsdatum). Sie lädt keine Modelle, startet keine Inferenz, scannt keine Netzwerkgeräte und führt keine Befehle aus. Beide Abfragen verwenden kurze Timeouts und folgen keinen HTTP-Weiterleitungen. Das Dashboard selbst bleibt ausschließlich an `127.0.0.1` gebunden.
 
 Die **Kommandozentrale** bietet außerdem eine schreibgeschützte Systemdiagnose (Plattform, Python-Version, Arbeitsspeicher, Speicherplatz und Ollama-Status), das Erstellen geprüfter SQLite-Backups und einen Verlauf der letzten 20 Sicherungen. Backups werden neu angelegt und nicht überschrieben. Die Aufgaben-Aktivitäten sind über die lokale API nachvollziehbar. Es gibt absichtlich keine freie Shell, keine Modell-Inferenz und keine Fernsteuerung zum Starten/Stoppen von Prozessen.
+
+
+---
+
+## 🧩 22. Getrennte Agentenausführung, Freigaben und Modell-Inferenz
+
+Diese drei Funktionen sind bewusst getrennt. Eine Freigabe ist keine Ausführung, ein Agentenstatus ist keine laufende Aktion und eine Modell-Inferenz darf keine Werkzeuge oder Systembefehle implizit starten.
+
+### Agentenausführung (kontrollierter erster Baustein)
+
+Der neue Modulpfad core/agent_runtime.py enthält einen expliziten Runtime-Dispatcher:
+
+- Nur vertrauenswürdige Python-Handler, die der Anwendungscode ausdrücklich registriert hat, sind ausführbar.
+- Keine Shell-Befehle, dynamischen Module, freien Funktionsnamen oder Code aus Nutzereingaben.
+- Vor jedem Lauf ist eine Freigabe über den separaten ApprovalManager erforderlich.
+- Die Freigabe bindet Agentenaktion und SHA-256 des kanonisierten JSON-Payloads; Änderungen am Payload machen sie ungültig.
+- Freigaben werden vor dem Dispatch einmalig verbraucht. Auch fehlgeschlagene Läufe verbrauchen die Freigabe.
+- Payloads und Ergebnisse sind auf jeweils 16 KiB begrenzt. Ausführungen erhalten einen Status und einen Fehlerklassennamen, aber keine sensiblen Exception-Details.
+
+Der Runtime-Baustein ist eine Bibliotheksfunktion. Er wird nicht automatisch durch das Dashboard oder einen Agentenstatus gestartet. Konkrete Agenten-Handler müssen separat implementiert, geprüft und registriert werden.
+
+### Freigabeverwaltung
+
+core/approval_manager.py verwaltet auslaufende, einmalige Freigaben. Ablehnen, Ablauf, falsche Aktion, falsche Payload-Bindung und erneute Verwendung werden getrennt behandelt. Die Freigabe führt selbst keine Aktion aus. Der aufrufende Ausführungsdienst muss sie ausdrücklich konsumieren.
+
+### Modell-Inferenz
+
+models/ollama.py ist der getrennte Ollama-Transport. Er akzeptiert nur Loopback-, private IP-, localhost- oder .local-Ziele, lehnt Zugangsdaten und URL-Pfade ab, folgt keinen HTTP-Weiterleitungen und begrenzt Timeout (maximal 120 Sekunden), Prompt (16.000 Zeichen), Systemanweisung (4.000 Zeichen), Modellnamen (120 Zeichen) und Antwort (64 KiB). models/llama.py wählt das konfigurierte Modell und ruft diesen Adapter auf. Ein Modell-Output ist weiterhin nur Text/JSON-Daten und erhält keine Ausführungsrechte.
+
+### Tests und Grenzen
+
+Die Tests liegen in tests/test_agent_runtime.py, tests/test_approval_manager.py und tests/test_llama.py. Sie prüfen Freigabezwang, einmalige Nutzung, Payload-Bindung, unbekannte Agenten, Eingabegrenzen, Fehlerzustände, private Ollama-Ziele und Redirect-Schutz. Ein erfolgreicher Test mit Mock-Transport beweist nicht, dass ein echtes Ollama-Modell installiert oder verfügbar ist. Die Inferenz benötigt einen separat gestarteten und erreichbaren Ollama-Dienst.
