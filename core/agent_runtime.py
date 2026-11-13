@@ -79,15 +79,12 @@ class AgentRuntime:
             action=f"agent.run:{agent}",
             description=f"Agentenausführung freigeben: {agent}",
             binding=digest,
+            payload=safe_payload,
         )
-        self._payloads[record.request_id] = safe_payload
         return record
 
     def payload_for(self, approval_id: str) -> dict[str, Any]:
-        payload = self._payloads.get(approval_id)
-        if payload is None:
-            raise KeyError("Approval payload is no longer available")
-        return json.loads(json.dumps(payload, ensure_ascii=False))
+        return self.approvals.payload_for(approval_id)
 
     def execute(
         self,
@@ -107,7 +104,6 @@ class AgentRuntime:
         approval = self.approvals.consume(
             approval_id, f"agent.run:{agent}", expected_binding=digest
         )
-        self._payloads.pop(approval_id, None)
         execution_id = secrets.token_urlsafe(9)
         while execution_id in self.executions:
             execution_id = secrets.token_urlsafe(9)
@@ -119,6 +115,7 @@ class AgentRuntime:
             created_at=time.time(),
         )
         self.executions[execution_id] = record
+        self.approvals.save_execution(record)
         try:
             result = handler(safe_payload)
             result_json = json.dumps(
@@ -131,9 +128,11 @@ class AgentRuntime:
             record.status = "failed"
             record.error = type(exc).__name__
             record.finished_at = time.time()
+            self.approvals.save_execution(record)
             raise AgentExecutionError(
                 f"Agent action failed ({record.error}); approval was consumed"
             ) from exc
         record.status = "completed"
         record.finished_at = time.time()
+        self.approvals.save_execution(record)
         return record, safe_result
