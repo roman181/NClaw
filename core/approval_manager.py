@@ -1,8 +1,7 @@
 """In-memory, one-time approval registry.
 
-Approvals authorize a named action for a short time. They do not execute it.
-A future side-effecting tool must call consume() immediately before acting.
-Pending approvals are intentionally cleared when the process restarts.
+Approvals authorize a named action and optional exact payload digest. They do
+not execute actions. Pending approvals are intentionally cleared on restart.
 """
 from __future__ import annotations
 
@@ -19,6 +18,7 @@ class ApprovalRecord:
     status: str
     created_at: float
     expires_at: float
+    binding: str | None = None
 
 
 class ApprovalManager:
@@ -28,11 +28,15 @@ class ApprovalManager:
         self.ttl_seconds = ttl_seconds
         self._records: dict[str, ApprovalRecord] = {}
 
-    def create(self, action: str, description: str) -> ApprovalRecord:
+    def create(
+        self, action: str, description: str, binding: str | None = None
+    ) -> ApprovalRecord:
         action = action.strip()
         description = description.strip()
         if not action or not description:
             raise ValueError("Action and description are required")
+        if binding is not None and (not isinstance(binding, str) or not binding):
+            raise ValueError("Binding must be a non-empty string")
         now = time.time()
         request_id = secrets.token_urlsafe(6)
         while request_id in self._records:
@@ -40,10 +44,11 @@ class ApprovalManager:
         record = ApprovalRecord(
             request_id=request_id,
             action=action[:100],
-            description=description[:1000],
+            description=description[:3500],
             status="pending",
             created_at=now,
             expires_at=now + self.ttl_seconds,
+            binding=binding,
         )
         self._records[request_id] = record
         return record
@@ -69,7 +74,12 @@ class ApprovalManager:
         record.status = "rejected"
         return record
 
-    def consume(self, request_id: str, expected_action: str) -> ApprovalRecord:
+    def consume(
+        self,
+        request_id: str,
+        expected_action: str,
+        expected_binding: str | None = None,
+    ) -> ApprovalRecord:
         """Consume a matching approved request exactly once before an action."""
         record = self._records.get(request_id)
         if record is None:
@@ -81,6 +91,8 @@ class ApprovalManager:
             raise TimeoutError("Approval request expired")
         if record.action != expected_action:
             raise PermissionError("Approval does not match the requested action")
+        if record.binding != expected_binding:
+            raise PermissionError("Approval does not match the exact action payload")
         record.status = "consumed"
         return record
 
