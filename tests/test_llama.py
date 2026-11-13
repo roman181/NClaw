@@ -1,10 +1,8 @@
 import httpx
 import pytest
 
-from models.ollama import OllamaError
-
 from models.llama import LlamaModel
-from models.ollama import OllamaClient
+from models.ollama import OllamaClient, OllamaError
 
 
 def test_llama_uses_single_configured_model():
