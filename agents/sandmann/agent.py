@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import stat
 import zipfile
 from pathlib import Path, PurePosixPath
 
-from sandbox.storage import LocalSandbox, MAX_IMPORT_BYTES
+from sandbox.storage import LocalSandbox
 
 MAX_ZIP_FILES = 500
 MAX_ZIP_UNPACKED_BYTES = 100 * 1024 * 1024
@@ -78,7 +77,7 @@ class SandmannAgent:
             if len(entries) > MAX_ZIP_FILES:
                 raise ValueError("ZIP enthält zu viele Einträge")
             for entry in entries:
-                name = entry.filename.replace("\\\\", "/")
+                name = entry.filename.replace("\\", "/")
                 member = PurePosixPath(name)
                 mode = entry.external_attr >> 16
                 if member.is_absolute() or any(part in {"", ".", ".."} for part in member.parts):
