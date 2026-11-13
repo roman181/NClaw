@@ -33,6 +33,10 @@ class LocalSandbox:
             folder.mkdir(mode=0o700, exist_ok=True)
             if folder.is_symlink() or not folder.resolve().is_relative_to(self.root):
                 raise ValueError(f"Unsafe sandbox folder: {name}")
+            try:
+                folder.chmod(0o700)
+            except OSError:
+                pass
 
     def folder(self, name: str) -> Path:
         if name not in self.FOLDERS:
