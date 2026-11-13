@@ -966,3 +966,18 @@ dashboard/
 ### Live-Systemmonitor
 
 Die Startseite zeigt zusätzlich schreibgeschützte Host-Metriken: RAM-Auslastung (wenn `/proc/meminfo` verfügbar ist), freien Speicherplatz des Home-Dateisystems, Load Average und Systemlaufzeit (wenn `/proc/uptime` verfügbar ist). Die Anzeige aktualisiert sich alle 10 Sekunden über `GET /api/system`. Es werden keine Prozesse beendet, keine Einstellungen verändert und keine externen Dienste kontaktiert.
+
+
+---
+
+## 📱 21. Android-PWA und Offline-Oberfläche
+
+Das lokale Dashboard kann auf Android in Chromium-basierten Browsern als App-Verknüpfung installiert werden.
+
+1. NClaw in Termux starten: `python -m dashboard.server`.
+2. Auf demselben Android-Gerät `http://127.0.0.1:8765` im Browser öffnen.
+3. Im Browser-Menü **App installieren** oder **Zum Startbildschirm hinzufügen** wählen (die Bezeichnung hängt vom Browser ab).
+
+Die PWA-Konfiguration liegt in `dashboard/static/manifest.webmanifest`. Der Service Worker speichert nur die statische Oberfläche (HTML, CSS, JavaScript, Manifest und Icon) zwischen. API-Antworten unter `/api/` werden ausdrücklich nicht gecacht; Aufgaben- und Systemdaten bleiben live und lokal. Wenn NClaw gestoppt ist, bleibt die Oberfläche möglicherweise sichtbar, aber dynamische Funktionen benötigen den laufenden lokalen Server.
+
+Die Installation benötigt keine Cloud, keinen externen Dienst und keine zusätzlichen Python-Abhängigkeiten. Das Dashboard bleibt an `127.0.0.1` gebunden.
