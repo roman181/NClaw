@@ -42,6 +42,8 @@ def test_dashboard_serves_ui_and_local_task_api(tmp_path: Path, monkeypatch):
             assert response.status == 200
             assert "addAll" in service_worker
             assert "/api/" in service_worker
+            assert "APP_SHELL.includes(url.pathname)" in service_worker
+            assert "Never cache API responses or arbitrary same-origin URLs" in service_worker
 
         with urlopen(base + "/icon.svg", timeout=3) as response:
             assert response.status == 200
