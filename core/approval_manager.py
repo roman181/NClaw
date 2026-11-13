@@ -6,6 +6,7 @@ import secrets
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -61,10 +62,18 @@ class ApprovalManager:
             except OSError:
                 pass
 
+    @contextmanager
     def _connect(self):
         db = sqlite3.connect(self.db_path, timeout=10)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            yield db
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
     @staticmethod
     def _record(row: sqlite3.Row) -> ApprovalRecord:
