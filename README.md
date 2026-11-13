@@ -538,12 +538,21 @@ GOOGLE_DRIVE_TOKEN=~/.nclaw/google-drive-token.json
 6. Eine zuvor geprüfte Datei nach `approved/` verschieben und den Upload ausdrücklich starten:
 
 ```bash
-python -m cloud.google_drive --file ~/.nclaw/approved/DATEI
+# Eine einzelne Datei sichern (nur aus ~/.nclaw/approved/)
+python -m cloud.google_drive upload --file ~/.nclaw/approved/DATEI
+
+# Bereits von NClaw erstellte Backups anzeigen
+python -m cloud.google_drive list
+
+# Ein Backup anhand seiner Drive-ID wiederherstellen
+python -m cloud.google_drive restore --id DRIVE_DATEI_ID
 ```
 
 Beim ersten Start zeigt NClaw eine Google-Anmeldeseite an. Den Link im Android-Browser öffnen und den Zugriff bestätigen. Der OAuth-Token bleibt lokal und wird mit restriktiven Dateirechten gespeichert. Der angeforderte Scope ist `drive.file`; NClaw erhält damit keinen pauschalen Zugriff auf dein gesamtes Drive.
 
-**Wichtig:** OAuth-Clientdatei und Token niemals in GitHub hochladen oder in Chats teilen. Für die Cloud wird nur der ausdrücklich angegebene und zuvor freigegebene Inhalt übertragen.
+**Wiederherstellung:** NClaw akzeptiert nur Dateien im eigenen Backup-Ordner mit passenden NClaw-Metadaten. Vor dem Speichern werden Dateigröße und SHA-256 geprüft. Die Datei landet ausschließlich in `quarantine/` und wird dort nicht entpackt oder ausgeführt. Nach der manuellen Prüfung kannst du sie mit Sandmann untersuchen und bei Bedarf bewusst freigeben. Ein Restore überschreibt keine vorhandenen Dateien.
+
+**Wichtig:** OAuth-Clientdatei und Token niemals in GitHub hochladen oder in Chats teilen. Upload und Restore werden nur durch einen ausdrücklich gestarteten CLI-Befehl ausgeführt; es gibt keinen Hintergrund-Sync.
 
 ---
 
