@@ -28,7 +28,7 @@ Die Steuerung erfolgt über eine zentrale Benutzeroberfläche und optional über
 - "4. Agententeam" (#-4-agententeam)
 - "5. Hauptfunktionen" (#-5-hauptfunktionen)
 - "6. Skill-Evolution" (#-6-skill-evolution)
-- "7. Zwei-Modell-Debatte" (#-7-zwei-modell-debatte)
+- "7. Llama-Einzelmodell" (#-7-zwei-modell-debatte)
 - "8. TokenGuard" (#-8-tokenguard)
 - "9. Sicherheit" (#-9-sicherheit)
 - "10. Voraussetzungen" (#-10-voraussetzungen)
@@ -88,8 +88,7 @@ flowchart TD
     UI <--> N
 
     N <--> S["📂 Sandmann"]
-    N <--> A["Qwen – Modell A"]
-    N <--> B["Llama – Modell B"]
+    N <--> A["Llama via Ollama"]
 
     A <--> D["Modell-Debatte"]
     B <--> D
@@ -112,7 +111,7 @@ Komponenten
 - Nexus: Zentrale Steuerung und Aufgabenverteilung.
 - Telegram-Agent: Kommunikation und Freigaben.
 - Sandmann: Dateiverarbeitung und Bibliotheksverwaltung.
-- Qwen: Erstes lokales KI-Modell.
+- Llama: Erstes lokales KI-Modell.
 - Llama: Zweites lokales KI-Modell.
 - TokenGuard: Modellwechsel und Kontextübergabe.
 - Skill-Baum: Visualisierung der Fähigkeiten.
@@ -268,20 +267,18 @@ Beispiel:
 
 ---
 
-🧩 7. Zwei-Modell-Debatte
+🧩 7. Llama-Einzelmodell
 
-NClaw soll zwei lokale KI-Modelle parallel einsetzen.
+NClaw nutzt ausschließlich ein lokales Llama-Modell über Ollama.
 
 Modell| Aufgabe
-Qwen| Analyse und Lösungsvorschlag
-Llama| Gegenprüfung und Verbesserung
+Llama | Analyse, Planung, Antwort und Selbstprüfung
 Nexus| Koordination und Entscheidung
 
 Ablauf
 
 1. Nexus erstellt eine Aufgabe.
-2. Qwen bearbeitet sie.
-3. Llama bearbeitet dieselbe Aufgabe unabhängig.
+2. Llama bearbeitet die Aufgabe und prüft seine Antwort vor der Ausgabe.
 4. Beide Ergebnisse werden verglichen.
 5. Unstimmigkeiten werden diskutiert.
 6. Nexus bewertet die Ergebnisse.
@@ -311,8 +308,7 @@ Beispiel einer Übergabe
 
 {
   "project": "nclaw",
-  "handoff_from": "qwen",
-  "handoff_to": "llama",
+  "model": "llama3.2",
   "token_usage_percent": 90,
   "goal": "Nexus Core entwickeln",
   "done": [
@@ -387,7 +383,7 @@ Benötigt:
 - Python 3.10 oder neuer.
 - Git.
 - Ollama auf einem erreichbaren Rechner.
-- Qwen und Llama.
+- Llama.
 - Optional Telegram-Bot.
 - Optional GitHub Personal Access Token.
 
@@ -417,7 +413,6 @@ cd NClaw
 
 Auf dem Rechner, auf dem Ollama läuft:
 
-ollama pull qwen2.5
 ollama pull llama3.2
 
 4. Virtuelle Python-Umgebung erstellen
@@ -456,8 +451,7 @@ GITHUB_TOKEN=
 OLLAMA_HOST=http://127.0.0.1:11434
 
 # Models
-MODEL_PRIMARY=qwen2.5
-MODEL_SECONDARY=llama3.2
+MODEL_NAME=llama3.2
 
 # NClaw
 NCLAW_ENV=development
@@ -504,8 +498,7 @@ nclaw/
 │
 ├── models/
 │   ├── ollama.py
-│   ├── qwen.py
-│   ├── llama.py
+│ │   ├── llama.py
 │   └── cloud_adapter.py
 │
 ├── skills/
@@ -596,9 +589,9 @@ Phase 1 – Grundsystem
 - [ ] Python-Projektstruktur
 - [ ] Konfigurationssystem
 - [ ] Lokale Speicherung
-- [ ] Ollama-Anbindung
-- [ ] Qwen-Integration
-- [ ] Llama-Integration
+- [x] Ollama-Anbindung (Basis)
+- [x] Llama-Integration
+- [x] Llama-Integration
 
 Phase 2 – Agenten
 
@@ -619,7 +612,7 @@ Phase 3 – Bibliothek
 
 Phase 4 – Intelligenz
 
-- [ ] Zwei-Modell-Debatte
+- [ ] Llama-Einzelmodell
 - [ ] TokenGuard
 - [ ] JSON-Handoff
 - [ ] Skill-Registry
@@ -674,7 +667,6 @@ Entwicklung und Review
 
 KI-Modelle und Vergleich
 
-- https://chat.qwen.ai/
 - https://duck.ai/
 - https://arena.ai/
 - https://www.designarena.ai/
