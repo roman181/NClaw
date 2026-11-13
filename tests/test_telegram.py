@@ -26,40 +26,41 @@ class FakeTelegram:
 
 
 def make_update(chat_id: int, text: str) -> dict:
-    return {
-        "update_id": 12,
-        "message": {"chat": {"id": chat_id}, "text": text},
-    }
+    return {"update_id": 12, "message": {"chat": {"id": chat_id}, "text": text}}
 
 
-def test_rejects_unapproved_chat() -> None:
+def test_rejects_unapproved_chat(tmp_path) -> None:
     telegram = FakeTelegram()
-    agent = TelegramAgent(telegram, "123", llama=FakeLlama())  # type: ignore[arg-type]
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama(), workspace=tmp_path)  # type: ignore[arg-type]
     agent.handle_update(make_update(999, "/help"))
     assert telegram.sent == []
 
 
-def test_help_command() -> None:
+def test_help_command(tmp_path) -> None:
     telegram = FakeTelegram()
-    agent = TelegramAgent(telegram, "123", llama=FakeLlama())  # type: ignore[arg-type]
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama(), workspace=tmp_path)  # type: ignore[arg-type]
     agent.handle_update(make_update(123, "/help"))
-    assert telegram.sent[0][0] == "123"
-    assert "/ask" in telegram.sent[0][1]
+    assert agent_help_has(telegram, "/ask")
+    assert "/propose_file" in telegram.sent[0][1]
 
 
-def test_ask_uses_llama() -> None:
+def agent_help_has(telegram: FakeTelegram, command: str) -> bool:
+    return command in telegram.sent[0][1]
+
+
+def test_ask_uses_llama(tmp_path) -> None:
     telegram = FakeTelegram()
     llama = FakeLlama()
-    agent = TelegramAgent(telegram, "123", llama=llama)  # type: ignore[arg-type]
+    agent = TelegramAgent(telegram, "123", llama=llama, workspace=tmp_path)  # type: ignore[arg-type]
     agent.handle_update(make_update(123, "/ask Erkläre NClaw"))
     assert llama.prompt == "Erkläre NClaw"
     assert "Telegram-Agent" in llama.system
     assert telegram.sent[-1][1] == "Hallo aus Llama."
 
 
-def test_unknown_command_does_not_execute_anything() -> None:
+def test_unknown_command_does_not_execute_anything(tmp_path) -> None:
     telegram = FakeTelegram()
-    agent = TelegramAgent(telegram, "123", llama=FakeLlama())  # type: ignore[arg-type]
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama(), workspace=tmp_path)  # type: ignore[arg-type]
     agent.handle_update(make_update(123, "/shell rm -rf /"))
     assert "Unbekannter Befehl" in telegram.sent[-1][1]
 
@@ -79,22 +80,59 @@ def test_telegram_client_sends_bot_api_request() -> None:
     http.close()
 
 
-
-def test_request_creates_pending_approval() -> None:
+def test_request_creates_pending_approval(tmp_path) -> None:
     telegram = FakeTelegram()
-    agent = TelegramAgent(telegram, "123", llama=FakeLlama())  # type: ignore[arg-type]
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama(), workspace=tmp_path)  # type: ignore[arg-type]
     agent.handle_update(make_update(123, "/request publish | Release v0.1"))
     assert "Freigabe angelegt" in telegram.sent[-1][1]
     assert "führt selbst noch nichts aus" in telegram.sent[-1][1]
     assert len(agent.approvals.pending()) == 1
 
 
-def test_approve_and_deny_commands_are_allowlisted() -> None:
+def test_approve_and_deny_commands_are_allowlisted(tmp_path) -> None:
     telegram = FakeTelegram()
-    agent = TelegramAgent(telegram, "123", llama=FakeLlama())  # type: ignore[arg-type]
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama(), workspace=tmp_path)  # type: ignore[arg-type]
     request = agent.approvals.create("publish", "Release v0.1")
     agent.handle_update(make_update(999, f"/approve {request.request_id}"))
     assert request.status == "pending"
     agent.handle_update(make_update(123, f"/approve {request.request_id}"))
     assert request.status == "approved"
-    assert "keine Aktion ausgeführt" in telegram.sent[-1][1]
+    assert "Freigabe allein führt noch keine Aktion aus" in telegram.sent[-1][1]
+
+
+def test_file_requires_approval_then_separate_execute(tmp_path) -> None:
+    telegram = FakeTelegram()
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama(), workspace=tmp_path)  # type: ignore[arg-type]
+    agent.handle_update(make_update(123, "/propose_file notes.txt | Hallo NClaw"))
+    request_id = next(iter(agent._file_proposals))
+    assert not (tmp_path / "notes.txt").exists()
+    assert "Exakter Inhalt:" in telegram.sent[-1][1]
+
+    agent.handle_update(make_update(123, f"/execute {request_id}"))
+    assert not (tmp_path / "notes.txt").exists()
+
+    agent.handle_update(make_update(123, f"/approve {request_id}"))
+    assert not (tmp_path / "notes.txt").exists()
+
+    agent.handle_update(make_update(123, f"/execute {request_id}"))
+    assert (tmp_path / "notes.txt").read_text(encoding="utf-8") == "Hallo NClaw"
+    assert "Datei erstellt" in telegram.sent[-1][1]
+
+
+def test_file_action_cannot_overwrite_existing_file(tmp_path) -> None:
+    (tmp_path / "notes.txt").write_text("original", encoding="utf-8")
+    telegram = FakeTelegram()
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama(), workspace=tmp_path)  # type: ignore[arg-type]
+    agent.handle_update(make_update(123, "/propose_file notes.txt | changed"))
+    assert "Dateivorschlag abgelehnt" in telegram.sent[-1][1]
+    assert (tmp_path / "notes.txt").read_text(encoding="utf-8") == "original"
+
+
+def test_unauthorized_chat_cannot_execute_file_proposal(tmp_path) -> None:
+    telegram = FakeTelegram()
+    agent = TelegramAgent(telegram, "123", llama=FakeLlama(), workspace=tmp_path)  # type: ignore[arg-type]
+    agent.handle_update(make_update(123, "/propose_file notes.txt | safe"))
+    request_id = next(iter(agent._file_proposals))
+    agent.handle_update(make_update(999, f"/approve {request_id}"))
+    agent.handle_update(make_update(999, f"/execute {request_id}"))
+    assert not (tmp_path / "notes.txt").exists()
