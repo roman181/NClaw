@@ -85,14 +85,20 @@ class OllamaClient:
                 transport=self.transport,
                 follow_redirects=False,
             ) as client:
-                response = client.post(
+                with client.stream(
+                    "POST",
                     f"{self.host}/api/chat",
                     json={"model": model, "messages": messages, "stream": False},
-                )
-                response.raise_for_status()
-                if len(response.content) > MAX_RESPONSE_BYTES:
-                    raise OllamaError("Ollama response exceeds the 64 KiB limit")
-                payload = response.json()
+                ) as response:
+                    response.raise_for_status()
+                    chunks = []
+                    response_size = 0
+                    for chunk in response.iter_bytes():
+                        response_size += len(chunk)
+                        if response_size > MAX_RESPONSE_BYTES:
+                            raise OllamaError("Ollama response exceeds the 64 KiB limit")
+                        chunks.append(chunk)
+                payload = httpx.Response(200, content=b"".join(chunks)).json()
         except OllamaError:
             raise
         except (httpx.HTTPError, ValueError) as exc:
