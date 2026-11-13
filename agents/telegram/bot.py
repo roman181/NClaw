@@ -152,8 +152,12 @@ class TelegramAgent:
                         if isinstance(update_id, int):
                             offset = update_id + 1
                         self.handle_update(update)
-                except (httpx.HTTPError, TelegramError):
-                    logger.exception("Telegram polling failed; retrying in 3 seconds")
+                except (httpx.HTTPError, TelegramError) as exc:
+                    # Do not log the request URL: Telegram bot tokens are part of it.
+                    logger.warning(
+                        "Telegram polling failed (%s); retrying in 3 seconds",
+                        type(exc).__name__,
+                    )
                     time.sleep(3)
         except KeyboardInterrupt:
             logger.info("NClaw Telegram-Agent stopped")
