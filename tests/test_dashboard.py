@@ -152,3 +152,37 @@ def test_ollama_status_rejects_public_hosts(monkeypatch):
     assert status["available"] is False
     assert status["version"] is None
     assert status["endpoint"] == "Ungültige OLLAMA_HOST-Konfiguration"
+
+def test_ollama_status_does_not_follow_redirects(monkeypatch):
+    calls = []
+    handlers = []
+
+    class Opener:
+        def open(self, request, timeout):
+            calls.append((request.full_url, timeout))
+            raise HTTPError(
+                request.full_url,
+                302,
+                "Found",
+                {"Location": "https://example.com/api/version"},
+                None,
+            )
+
+    def fake_build_opener(*configured_handlers):
+        handlers.extend(configured_handlers)
+        return Opener()
+
+    monkeypatch.setenv("OLLAMA_HOST", "http://192.168.1.50:11434")
+    monkeypatch.setattr(dashboard_server, "build_opener", fake_build_opener)
+
+    status = dashboard_server.ollama_status()
+
+    assert status["ok"] is True
+    assert status["available"] is False
+    assert status["version"] is None
+    assert status["endpoint"] == "192.168.1.50:11434"
+    assert calls == [("http://192.168.1.50:11434/api/version", 0.8)]
+    assert len(handlers) == 1
+    assert isinstance(handlers[0], dashboard_server._NoRedirect)
+    assert handlers[0].redirect_request(None, None, 302, "Found", {}, "https://example.com/api/version") is None
+
