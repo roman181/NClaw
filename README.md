@@ -905,3 +905,59 @@ tests/
 - [ ] Nexus-Aufgabenplanung mit expliziter Nutzerfreigabe
 - [ ] Dashboard für Aufgaben und Agentenstatus
 - [ ] Zeitgesteuerte Ausführung ausschließlich nach konfigurierter Freigabe
+
+
+---
+
+## 🖥️ 20. NClaw HTML Dashboard & Kommandozentrale
+
+Ein responsives HTML5-Dashboard für Android/Termux und Linux. Die Oberfläche spricht ausschließlich mit einem kleinen lokalen Python-Server und der vorhandenen SQLite-Aufgabenverwaltung.
+
+### Start
+
+```bash
+python -m dashboard.server
+```
+
+Anschließend im Browser öffnen:
+
+```text
+http://127.0.0.1:8765
+```
+
+Optionaler Port:
+
+```bash
+NCLAW_DASHBOARD_PORT=9000 python -m dashboard.server
+```
+
+### Dashboard-Menü
+
+- Übersicht mit Statuskarten und letzten Aufgaben
+- Aufgabenverwaltung mit Anlegen, Filtern und Statuswechseln
+- Agentenübersicht für Nexus, Sandmann, TokenGuard und Task Engine
+- Kommandozentrale mit begrenzten, erlaubten Aufgabenaktionen
+- Aktivitätsübersicht
+- Sicherheitsbereich und Einstellungen
+
+### Sicherheit
+
+- Bindet standardmäßig ausschließlich an `127.0.0.1`.
+- Keine beliebige Shell-, Python- oder Terminal-Ausführung.
+- Keine Agentenstarts oder externen API-Aufrufe aus dem Dashboard.
+- Nur fest definierte HTTP-Routen.
+- Eingaben werden serverseitig validiert.
+- Statuswechsel verwenden die Regeln der Task Engine.
+- Das Dashboard ist ein lokales Kontrollpanel, kein öffentlich abgesicherter Webdienst. Nicht ungeschützt ins Internet oder LAN exponieren.
+
+### Dateien
+
+```text
+dashboard/
+├── __init__.py
+├── server.py
+└── static/
+    ├── index.html
+    ├── style.css
+    └── app.js
+```
