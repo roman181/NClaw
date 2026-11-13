@@ -101,7 +101,7 @@ class TelegramAgent:
 
     @staticmethod
     def _file_binding(relative_path: str, content: str) -> str:
-        payload = f"{relative_path}\0{content}".encode("utf-8")
+        payload = f"{relative_path}\0{content}".encode()
         return hashlib.sha256(payload).hexdigest()
 
     def handle_update(self, update: dict[str, Any]) -> None:
@@ -164,7 +164,7 @@ class TelegramAgent:
             if not separator or not relative_path or not content.strip():
                 self._reply(chat_id, "Format: /propose_file PFAD | INHALT")
                 return
-            content = content[1:] if content.startswith(" ") else content
+            content = content.removeprefix(" ")
             if len(content) > MAX_FILE_CONTENT_LENGTH:
                 self._reply(chat_id, f"Dateiinhalt zu lang (maximal {MAX_FILE_CONTENT_LENGTH} Zeichen).")
                 return
