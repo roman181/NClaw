@@ -10,6 +10,7 @@ import json
 import os
 import platform
 import shutil
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -211,6 +212,12 @@ class DashboardHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             payload = self._body()
+            if path == "/api/backup":
+                backup_dir = STORE.path.parent / "backups"
+                stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+                backup_path = STORE.backup(backup_dir / f"tasks-{stamp}.sqlite3")
+                self._json(201, {"ok": True, "filename": backup_path.name})
+                return
             if path == "/api/tasks":
                 title = payload.get("title")
                 description = payload.get("description", "")
