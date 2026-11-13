@@ -56,16 +56,18 @@ class GoogleDriveStorage:
                                         spaces="drive", fields="files(id,name)", pageSize=10).execute()
         if response.get("files"):
             return response["files"][0]["id"]
-        from googleapiclient.http import MediaFileUpload
         metadata = {"name": self.folder_name, "mimeType": "application/vnd.google-apps.folder"}
         folder = service.files().create(body=metadata, fields="id").execute()
         return folder["id"]
 
     def upload_approved_file(self, file_path: str | Path) -> dict[str, str]:
         """Upload one file from sandbox/approved; never sync incoming automatically."""
-        path = Path(file_path).expanduser().resolve(strict=True)
+        candidate = Path(file_path).expanduser()
+        if candidate.is_symlink():
+            raise ValueError("Symbolische Links dürfen nicht hochgeladen werden")
+        path = candidate.resolve(strict=True)
         approved = (self.root / "approved").resolve(strict=True)
-        if not path.is_relative_to(approved) or not path.is_file() or path.is_symlink():
+        if not path.is_relative_to(approved) or not path.is_file():
             raise ValueError("Nur reguläre Dateien aus dem Ordner approved dürfen hochgeladen werden")
         service = self._service()
         from googleapiclient.http import MediaFileUpload
@@ -75,3 +77,23 @@ class GoogleDriveStorage:
         media = MediaFileUpload(str(path), mimetype=mime_type, resumable=True)
         result = service.files().create(body=metadata, media_body=media, fields="id,name,webViewLink").execute()
         return {"id": result["id"], "name": result["name"], "url": result.get("webViewLink", "")}
+
+
+def main() -> None:
+    """Upload one already-approved file after an explicit local CLI invocation."""
+    import argparse
+    from dotenv import load_dotenv
+
+    from sandbox.storage import LocalSandbox
+
+    load_dotenv()
+    parser = argparse.ArgumentParser(description="NClaw: approved file to Google Drive")
+    parser.add_argument("--file", required=True, help="File path inside sandbox/approved")
+    args = parser.parse_args()
+    storage = LocalSandbox()
+    result = GoogleDriveStorage(storage.root).upload_approved_file(args.file)
+    print(f"Upload erfolgreich: {result['name']} (Drive-ID: {result['id']})")
+
+
+if __name__ == "__main__":
+    main()
