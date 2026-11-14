@@ -1013,7 +1013,7 @@ Der Runtime-Baustein ist eine Bibliotheksfunktion. Er wird nicht automatisch dur
 
 ### Freigabeverwaltung
 
-core/approval_manager.py verwaltet auslaufende, einmalige Freigaben. Ablehnen, Ablauf, falsche Aktion, falsche Payload-Bindung und erneute Verwendung werden getrennt behandelt. Die Freigabe führt selbst keine Aktion aus. Der aufrufende Ausführungsdienst muss sie ausdrücklich konsumieren.
+core/approval_manager.py verwaltet auslaufende, einmalige Freigaben. Ablehnen, Ablauf, falsche Aktion, falsche Payload-Bindung und erneute Verwendung werden getrennt behandelt. Bei SQLite-Persistenz laufen konkurrierende Freigabe- und Ablehnungsentscheidungen über eine `BEGIN IMMEDIATE`-Transaktion und einen bedingten Statuswechsel aus `pending`; dadurch kann nur eine Entscheidung gewinnen, auch wenn mehrere Manager-Instanzen gleichzeitig arbeiten. Die Freigabe führt selbst keine Aktion aus. Der aufrufende Ausführungsdienst muss sie ausdrücklich konsumieren.
 
 ### Modell-Inferenz
 

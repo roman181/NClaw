@@ -124,13 +124,65 @@ class ApprovalManager:
 
     def _decide(self, request_id: str, decision: str) -> ApprovalRecord:
         with self._lock:
-            record = self._get(request_id)
-            if record.status != "pending":
-                raise ValueError(f"Request is already {record.status}")
-            if time.time() >= record.expires_at:
-                self._set_status(request_id, "expired")
-                raise TimeoutError("Approval request expired")
-            self._set_status(request_id, decision)
+            if self.db_path is None:
+                record = self._get(request_id)
+                if record.status != "pending":
+                    raise ValueError(f"Request is already {record.status}")
+                if time.time() >= record.expires_at:
+                    self._set_status(request_id, "expired")
+                    raise TimeoutError("Approval request expired")
+                self._set_status(request_id, decision)
+                return self._get(request_id)
+
+            # Serialize decisions across processes, not just threads sharing this
+            # manager instance. The conditional UPDATE makes pending -> decision
+            # a single atomic state transition.
+            failure: Exception | None = None
+            with self._connect() as db:
+                db.execute("BEGIN IMMEDIATE")
+                row = db.execute(
+                    "SELECT status, expires_at FROM approvals WHERE request_id=?",
+                    (request_id,),
+                ).fetchone()
+                if row is None:
+                    failure = KeyError("Approval request not found")
+                elif row["status"] != "pending":
+                    failure = ValueError(f"Request is already {row['status']}")
+                else:
+                    now = time.time()
+                    if now >= row["expires_at"]:
+                        db.execute(
+                            "UPDATE approvals SET status='expired' "
+                            "WHERE request_id=? AND status='pending'",
+                            (request_id,),
+                        )
+                        failure = TimeoutError("Approval request expired")
+                    else:
+                        changed = db.execute(
+                            "UPDATE approvals SET status=? "
+                            "WHERE request_id=? AND status='pending' AND expires_at>?",
+                            (decision, request_id, now),
+                        ).rowcount
+                        if changed != 1:
+                            current = db.execute(
+                                "SELECT status FROM approvals WHERE request_id=?",
+                                (request_id,),
+                            ).fetchone()
+                            if current is None:
+                                failure = KeyError("Approval request not found")
+                            elif current["status"] != "pending":
+                                failure = ValueError(
+                                    f"Request is already {current['status']}"
+                                )
+                            else:
+                                db.execute(
+                                    "UPDATE approvals SET status='expired' "
+                                    "WHERE request_id=? AND status='pending'",
+                                    (request_id,),
+                                )
+                                failure = TimeoutError("Approval request expired")
+            if failure is not None:
+                raise failure
             return self._get(request_id)
 
     def _set_status(self, request_id: str, status: str) -> None:

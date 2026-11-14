@@ -88,3 +88,52 @@ def test_sqlite_execution_history_survives_manager_restart(tmp_path):
     records = restored.list_executions()
     assert records[0]["execution_id"] == "exec-1"
     assert records[0]["status"] == "completed"
+
+
+def test_sqlite_concurrent_decisions_are_atomic_across_manager_instances(
+    tmp_path, monkeypatch
+):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    database = tmp_path / "approvals.sqlite3"
+    creator = ApprovalManager(db_path=database)
+    request = creator.create("agent.run:notes", "Run a notes agent")
+
+    approver = ApprovalManager(db_path=database)
+    rejecter = ApprovalManager(db_path=database)
+    pending_reads = Barrier(2)
+
+    def synchronize_pending_reads(manager):
+        original_get = manager._get
+
+        def synchronized_get(request_id):
+            record = original_get(request_id)
+            if record.status == "pending":
+                pending_reads.wait(timeout=5)
+            return record
+
+        monkeypatch.setattr(manager, "_get", synchronized_get)
+
+    synchronize_pending_reads(approver)
+    synchronize_pending_reads(rejecter)
+
+    def decide(manager, method_name):
+        try:
+            result = getattr(manager, method_name)(request.request_id)
+            return ("success", result.status)
+        except ValueError:
+            return ("conflict", None)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(decide, approver, "approve"),
+            executor.submit(decide, rejecter, "reject"),
+        ]
+        results = [future.result(timeout=10) for future in futures]
+
+    assert sum(result[0] == "success" for result in results) == 1
+    assert sum(result[0] == "conflict" for result in results) == 1
+    final_status = creator.get(request.request_id).status
+    assert final_status in {"approved", "rejected"}
+    assert final_status == next(result[1] for result in results if result[0] == "success")
