@@ -137,3 +137,54 @@ def test_sqlite_concurrent_decisions_are_atomic_across_manager_instances(
     final_status = creator.get(request.request_id).status
     assert final_status in {"approved", "rejected"}
     assert final_status == next(result[1] for result in results if result[0] == "success")
+
+
+
+def test_sqlite_concurrent_consumption_is_one_time_across_manager_instances(
+    tmp_path, monkeypatch
+):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    database = tmp_path / "approvals.sqlite3"
+    creator = ApprovalManager(db_path=database)
+    request = creator.create(
+        "agent.run:notes", "Run a notes agent", binding="payload-digest"
+    )
+    creator.approve(request.request_id)
+
+    consumers = [
+        ApprovalManager(db_path=database),
+        ApprovalManager(db_path=database),
+    ]
+    approved_reads = Barrier(2)
+
+    for manager in consumers:
+        original_get = manager._get
+        synchronized = {"first": True}
+
+        def synchronized_get(request_id, *, _get=original_get, _state=synchronized):
+            record = _get(request_id)
+            if record.status == "approved" and _state["first"]:
+                _state["first"] = False
+                approved_reads.wait(timeout=5)
+            return record
+
+        monkeypatch.setattr(manager, "_get", synchronized_get)
+
+    def consume(manager):
+        try:
+            record = manager.consume(
+                request.request_id, "agent.run:notes", "payload-digest"
+            )
+            return ("success", record.status)
+        except PermissionError:
+            return ("denied", None)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(consume, manager) for manager in consumers]
+        results = [future.result(timeout=10) for future in futures]
+
+    assert sum(result[0] == "success" for result in results) == 1
+    assert sum(result[0] == "denied" for result in results) == 1
+    assert creator.get(request.request_id).status == "consumed"
