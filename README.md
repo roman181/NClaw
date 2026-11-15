@@ -1006,7 +1006,8 @@ Der neue Modulpfad core/agent_runtime.py enthält einen expliziten Runtime-Dispa
 - Keine Shell-Befehle, dynamischen Module, freien Funktionsnamen oder Code aus Nutzereingaben.
 - Vor jedem Lauf ist eine Freigabe über den separaten ApprovalManager erforderlich.
 - Die Freigabe bindet Agentenaktion und SHA-256 des kanonisierten JSON-Payloads; Änderungen am Payload machen sie ungültig.
-- Freigaben werden vor dem Dispatch einmalig verbraucht. Auch fehlgeschlagene Läufe verbrauchen die Freigabe.
+- Freigabeverbrauch und persistenter Start-Audit-Eintrag (`running`) werden bei SQLite in einer gemeinsamen Transaktion gespeichert, bevor der Handler aufgerufen wird. Ein Prozessabbruch zwischen Verbrauch und Audit-Anlage kann dadurch keinen unsichtbaren Ausführungsstart erzeugen.
+- Auch fehlgeschlagene Läufe verbrauchen die Freigabe. Wird der Prozess während eines Laufs beendet, bleibt `running` als letzter bekannter Status erhalten; es gibt keine automatische Wiederholung.
 - Payloads und Ergebnisse sind auf jeweils 16 KiB begrenzt. Ausführungen erhalten einen Status und einen Fehlerklassennamen, aber keine sensiblen Exception-Details.
 
 Der Runtime-Baustein ist eine Bibliotheksfunktion. Er wird nicht automatisch durch das Dashboard oder einen Agentenstatus gestartet. Konkrete Agenten-Handler müssen separat implementiert, geprüft und registriert werden.
@@ -1036,7 +1037,7 @@ Die Kommandozentrale verbindet jetzt drei getrennte, lokal kontrollierte Abläuf
 2. Der Vorschlag wird als `pending` in der Freigabeverwaltung angezeigt. Vor der Freigabe wird nichts ausgeführt.
 3. Die Schaltfläche **Freigeben** autorisiert nur genau diese Aktion und den unveränderten JSON-Inhalt. **Ablehnen** beendet den Vorschlag.
 4. Erst ein zusätzlicher Klick auf **Jetzt ausführen** konsumiert die Freigabe einmalig und legt die Aufgabe an.
-5. Freigaben verfallen nach zehn Minuten. Freigaben, die dafür nötigen begrenzten JSON-Payloads und der Ausführungsverlauf liegen lokal in `~/.nclaw/approvals.sqlite3` (im Verzeichnis der Aufgaben-Datenbank). Pending-/Approved-Freigaben bleiben über einen Neustart erhalten, verfallen aber weiterhin nach zehn Minuten. Der einmalige Verbrauch wird mit einer SQLite-Transaktion atomar gesichert. Es werden keine Modell-Prompts oder Inferenzantworten in diesem Audit-Register gespeichert.
+5. Freigaben verfallen nach zehn Minuten. Freigaben, die dafür nötigen begrenzten JSON-Payloads und der Ausführungsverlauf liegen lokal in `~/.nclaw/approvals.sqlite3` (im Verzeichnis der Aufgaben-Datenbank). Pending-/Approved-Freigaben bleiben über einen Neustart erhalten, verfallen aber weiterhin nach zehn Minuten. Freigabeverbrauch und persistenter Start-Audit-Eintrag (`running`) werden in einer gemeinsamen SQLite-Transaktion gesichert. Bei einem Prozessabbruch bleibt `running` als letzter bekannter Status sichtbar; es erfolgt keine automatische Wiederaufnahme. Es werden keine Modell-Prompts oder Inferenzantworten in diesem Audit-Register gespeichert.
 
 Die API-Endpunkte sind `GET /api/approvals`, `POST /api/agent-actions/propose`, `POST /api/approvals/{id}/decision`, `POST /api/agent-executions` und `GET /api/agent-executions`. Die Registry schützt Freigabeänderungen und einmaligen Verbrauch mit einem Lock. Es gibt keine Shell-, dynamische Code- oder freie Funktionsausführung.
 
