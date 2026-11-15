@@ -1022,7 +1022,7 @@ models/ollama.py ist der getrennte Ollama-Transport. Er akzeptiert nur Loopback-
 
 ### Tests und Grenzen
 
-Die Tests liegen in tests/test_agent_runtime.py, tests/test_approval_manager.py und tests/test_llama.py. Sie prüfen Freigabezwang, einmalige Nutzung, Payload-Bindung, unbekannte Agenten, Eingabegrenzen, Fehlerzustände, private Ollama-Ziele und Redirect-Schutz. Ein erfolgreicher Test mit Mock-Transport beweist nicht, dass ein echtes Ollama-Modell installiert oder verfügbar ist. Die Inferenz benötigt einen separat gestarteten und erreichbaren Ollama-Dienst.
+Die Tests liegen in tests/test_agent_runtime.py, tests/test_approval_manager.py und tests/test_llama.py. Sie prüfen Freigabezwang, einmalige Nutzung, Payload-Bindung, die atomare Kopplung von Freigabeverbrauch und `running`-Audit-Eintrag einschließlich Rollback bei einem fehlgeschlagenen Insert, unbekannte Agenten, Eingabegrenzen, Fehlerzustände, private Ollama-Ziele und Redirect-Schutz. Ein erfolgreicher Test mit Mock-Transport beweist nicht, dass ein echtes Ollama-Modell installiert oder verfügbar ist. Die Inferenz benötigt einen separat gestarteten und erreichbaren Ollama-Dienst.
 
 
 ---
