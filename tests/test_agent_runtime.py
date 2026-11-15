@@ -59,6 +59,64 @@ def test_payload_must_be_bounded_json():
         runtime.propose("notes", {"large": "x" * 20_000})
 
 
+def test_persistent_execution_start_is_recorded_before_handler_runs(tmp_path):
+    approvals = __import__("core.approval_manager", fromlist=["ApprovalManager"]).ApprovalManager(
+        db_path=tmp_path / "approvals.sqlite3"
+    )
+    runtime = AgentRuntime(approvals)
+    observed = {}
+
+    def inspect_start(_payload):
+        observed["executions"] = approvals.list_executions()
+        observed["approval_status"] = approvals.get(request.request_id).status
+        return {"ok": True}
+
+    runtime.register("notes", inspect_start)
+    request = runtime.propose("notes", {"title": "Plan"})
+    approvals.approve(request.request_id)
+
+    runtime.execute(request.request_id, "notes")
+
+    assert observed["approval_status"] == "consumed"
+    assert len(observed["executions"]) == 1
+    assert observed["executions"][0]["approval_id"] == request.request_id
+    assert observed["executions"][0]["status"] == "running"
+    assert approvals.list_executions()[0]["status"] == "completed"
+
+
+def test_execution_start_insert_failure_rolls_back_approval_consumption(
+    tmp_path, monkeypatch
+):
+    import sqlite3
+    from types import SimpleNamespace
+
+    from core.approval_manager import ApprovalManager
+
+    approvals = ApprovalManager(db_path=tmp_path / "approvals.sqlite3")
+    approvals.save_execution(SimpleNamespace(
+        execution_id="collision",
+        agent="existing",
+        approval_id="existing-approval",
+        status="completed",
+        created_at=1.0,
+        finished_at=2.0,
+        error=None,
+    ))
+    runtime = AgentRuntime(approvals)
+    calls = []
+    runtime.register("notes", lambda payload: calls.append(payload))
+    request = runtime.propose("notes", {"title": "Plan"})
+    approvals.approve(request.request_id)
+    monkeypatch.setattr("core.agent_runtime.secrets.token_urlsafe", lambda _size: "collision")
+
+    with pytest.raises(sqlite3.IntegrityError):
+        runtime.execute(request.request_id, "notes")
+
+    assert approvals.get(request.request_id).status == "approved"
+    assert calls == []
+    assert [item["execution_id"] for item in approvals.list_executions()] == ["collision"]
+
+
 def test_failed_action_is_recorded_and_approval_is_consumed():
     runtime = AgentRuntime()
     def fail(_payload):
