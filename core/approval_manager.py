@@ -256,6 +256,106 @@ class ApprovalManager:
                 rows = db.execute("SELECT * FROM approvals ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
             return [self._record(row) for row in rows]
 
+    def consume_and_start_execution(
+        self,
+        request_id: str,
+        expected_action: str,
+        expected_binding: str | None,
+        record: Any,
+    ) -> ApprovalRecord:
+        """Consume approval and persist the running audit row atomically."""
+        item = {
+            "execution_id": record.execution_id,
+            "agent": record.agent,
+            "approval_id": record.approval_id,
+            "status": record.status,
+            "created_at": record.created_at,
+            "finished_at": record.finished_at,
+            "error": record.error,
+        }
+        if item["approval_id"] != request_id:
+            raise ValueError("Execution record must reference its approval")
+
+        with self._lock:
+            if self.db_path is None:
+                approval = self._get(request_id)
+                if approval.status != "approved":
+                    raise PermissionError("Request has not been approved")
+                if time.time() >= approval.expires_at:
+                    self._set_status(request_id, "expired")
+                    raise TimeoutError("Approval request expired")
+                if approval.action != expected_action:
+                    raise PermissionError("Approval does not match the requested action")
+                if approval.binding != expected_binding:
+                    raise PermissionError("Approval does not match the exact action payload")
+                if item["execution_id"] in self._executions:
+                    raise ValueError("Execution ID already exists")
+                self._set_status(request_id, "consumed")
+                self._executions[item["execution_id"]] = item
+                return self._get(request_id)
+
+            failure: Exception | None = None
+            with self._connect() as db:
+                db.execute("BEGIN IMMEDIATE")
+                approval = db.execute(
+                    "SELECT action, binding, status, expires_at "
+                    "FROM approvals WHERE request_id=?",
+                    (request_id,),
+                ).fetchone()
+                if approval is None:
+                    failure = KeyError("Approval request not found")
+                elif approval["status"] != "approved":
+                    failure = PermissionError("Request has not been approved")
+                else:
+                    now = time.time()
+                    if now >= approval["expires_at"]:
+                        db.execute(
+                            "UPDATE approvals SET status='expired' "
+                            "WHERE request_id=? AND status='approved'",
+                            (request_id,),
+                        )
+                        failure = TimeoutError("Approval request expired")
+                    elif approval["action"] != expected_action:
+                        failure = PermissionError(
+                            "Approval does not match the requested action"
+                        )
+                    elif approval["binding"] != expected_binding:
+                        failure = PermissionError(
+                            "Approval does not match the exact action payload"
+                        )
+                    else:
+                        changed = db.execute(
+                            "UPDATE approvals SET status='consumed' "
+                            "WHERE request_id=? AND status='approved' AND expires_at>?",
+                            (request_id, now),
+                        ).rowcount
+                        if changed != 1:
+                            current = db.execute(
+                                "SELECT status FROM approvals WHERE request_id=?",
+                                (request_id,),
+                            ).fetchone()
+                            if current is None:
+                                failure = KeyError("Approval request not found")
+                            elif current["status"] != "approved":
+                                failure = PermissionError(
+                                    "Request has already been decided or consumed"
+                                )
+                            else:
+                                db.execute(
+                                    "UPDATE approvals SET status='expired' "
+                                    "WHERE request_id=? AND status='approved'",
+                                    (request_id,),
+                                )
+                                failure = TimeoutError("Approval request expired")
+                        else:
+                            db.execute(
+                                "INSERT INTO agent_executions VALUES(?,?,?,?,?,?,?)",
+                                tuple(item.values()),
+                            )
+            if failure is not None:
+                raise failure
+            return self._get(request_id)
+
     def save_execution(self, record: Any) -> None:
         item = {
             "execution_id": record.execution_id, "agent": record.agent,
