@@ -101,21 +101,22 @@ class AgentRuntime:
                 raise PermissionError("Request has not been approved or was already consumed")
             payload = self.payload_for(approval_id)
         safe_payload, digest = self._serialize_payload(payload)
-        approval = self.approvals.consume(
-            approval_id, f"agent.run:{agent}", expected_binding=digest
-        )
         execution_id = secrets.token_urlsafe(9)
         while execution_id in self.executions:
             execution_id = secrets.token_urlsafe(9)
         record = ExecutionRecord(
             execution_id=execution_id,
             agent=agent,
-            approval_id=approval.request_id,
+            approval_id=approval_id,
             status="running",
             created_at=time.time(),
         )
+        # Persist the consumed approval and running audit row in one transaction
+        # before any trusted handler is invoked.
+        self.approvals.consume_and_start_execution(
+            approval_id, f"agent.run:{agent}", digest, record
+        )
         self.executions[execution_id] = record
-        self.approvals.save_execution(record)
         try:
             result = handler(safe_payload)
             result_json = json.dumps(
