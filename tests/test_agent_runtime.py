@@ -2,6 +2,7 @@
 import pytest
 
 from core.agent_runtime import AgentExecutionError, AgentRuntime
+from core.approval_manager import ApprovalManager
 
 
 def test_agent_action_requires_matching_explicit_approval():
@@ -60,9 +61,7 @@ def test_payload_must_be_bounded_json():
 
 
 def test_persistent_execution_start_is_recorded_before_handler_runs(tmp_path):
-    approvals = __import__("core.approval_manager", fromlist=["ApprovalManager"]).ApprovalManager(
-        db_path=tmp_path / "approvals.sqlite3"
-    )
+    approvals = ApprovalManager(db_path=tmp_path / "approvals.sqlite3")
     runtime = AgentRuntime(approvals)
     observed = {}
 
@@ -89,8 +88,6 @@ def test_execution_start_insert_failure_rolls_back_approval_consumption(
 ):
     import sqlite3
     from types import SimpleNamespace
-
-    from core.approval_manager import ApprovalManager
 
     approvals = ApprovalManager(db_path=tmp_path / "approvals.sqlite3")
     approvals.save_execution(SimpleNamespace(
