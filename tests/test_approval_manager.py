@@ -188,3 +188,51 @@ def test_sqlite_concurrent_consumption_is_one_time_across_manager_instances(
     assert sum(result[0] == "success" for result in results) == 1
     assert sum(result[0] == "denied" for result in results) == 1
     assert creator.get(request.request_id).status == "consumed"
+
+
+@pytest.mark.parametrize("persistent", [False, True])
+def test_approval_payload_is_bounded_before_storage(tmp_path, persistent):
+    database = tmp_path / "approvals.sqlite3" if persistent else None
+    manager = ApprovalManager(db_path=database)
+
+    with pytest.raises(ValueError, match="16 KiB"):
+        manager.create(
+            "agent.run:notes",
+            "Run a notes agent",
+            payload={"text": "x" * (16 * 1024)},
+        )
+    assert manager.list() == []
+
+    with pytest.raises(TypeError, match="JSON object"):
+        manager.create(
+            "agent.run:notes",
+            "Run a notes agent",
+            payload=["not", "an", "object"],
+        )
+    assert manager.list() == []
+
+
+def test_approval_payload_limit_counts_utf8_bytes():
+    manager = ApprovalManager()
+    with pytest.raises(ValueError, match="16 KiB"):
+        manager.create(
+            "agent.run:notes",
+            "Run a notes agent",
+            payload={"text": "ä" * 9_000},
+        )
+
+
+def test_approval_payload_is_copied_before_storage():
+    manager = ApprovalManager()
+    original = {"nested": {"value": "before"}}
+    request = manager.create(
+        "agent.run:notes",
+        "Run a notes agent",
+        payload=original,
+    )
+
+    original["nested"]["value"] = "after"
+
+    assert manager.payload_for(request.request_id) == {
+        "nested": {"value": "before"}
+    }
