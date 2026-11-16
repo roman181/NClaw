@@ -11,7 +11,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-
 MAX_APPROVAL_PAYLOAD_BYTES = 16 * 1024
 
 
