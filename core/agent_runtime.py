@@ -14,9 +14,13 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from core.approval_manager import ApprovalManager, ApprovalRecord
+from core.approval_manager import (
+    MAX_APPROVAL_PAYLOAD_BYTES,
+    ApprovalManager,
+    ApprovalRecord,
+)
 
-MAX_PAYLOAD_BYTES = 16_384
+MAX_PAYLOAD_BYTES = MAX_APPROVAL_PAYLOAD_BYTES
 
 
 class AgentExecutionError(RuntimeError):
