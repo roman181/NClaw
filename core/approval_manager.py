@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any
 
 
+MAX_APPROVAL_PAYLOAD_BYTES = 16 * 1024
+
+
 @dataclass
 class ApprovalRecord:
     request_id: str
@@ -93,12 +96,32 @@ class ApprovalManager:
             raise ValueError("Action and description are required")
         if binding is not None and (not isinstance(binding, str) or not binding):
             raise ValueError("Binding must be a non-empty string")
-        payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True, allow_nan=False) if payload is not None else None
+        safe_payload: dict[str, Any] | None = None
+        payload_json: str | None = None
+        if payload is not None:
+            if not isinstance(payload, dict):
+                raise TypeError("Approval payload must be a JSON object")
+            try:
+                payload_json = json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    "Approval payload must contain only finite JSON values"
+                ) from exc
+            if len(payload_json.encode("utf-8")) > MAX_APPROVAL_PAYLOAD_BYTES:
+                raise ValueError("Approval payload exceeds the 16 KiB limit")
+            safe_payload = json.loads(payload_json)
+
         now = time.time()
         with self._lock:
             request_id = secrets.token_urlsafe(9)
             record = ApprovalRecord(request_id, action[:100], description[:3500],
-                                    "pending", now, now + self.ttl_seconds, binding, payload)
+                                    "pending", now, now + self.ttl_seconds, binding, safe_payload)
             if self.db_path is None:
                 self._records[request_id] = record
             else:
