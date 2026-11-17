@@ -1066,6 +1066,8 @@ Die Seite **Aktivitäten → Audit & Aktivitäten** fasst die letzten 50 Freigab
 
 Der Umfang ist bewusst auf die letzten 50 Freigaben und 50 Ausführungen begrenzt. Es werden keine zusätzlichen personenbezogenen Inhalte oder Modell-Prompts gespeichert.
 
+Laufende Ausführungen erhalten zusätzlich eine rein lesende Prozessdiagnose: Auf Linux und Android/Termux wird die PID mit dem Startzeit-Token aus `/proc/<pid>/stat` verglichen. So werden aktive Prozesse, beendete bzw. durch PID-Wiederverwendung ersetzte Prozesse und nicht prüfbare Umgebungen als `active`, `interrupted` oder `unknown` unterschieden. PID und Start-Token bleiben intern in der lokalen SQLite-Datenbank und werden nicht an den Browser ausgegeben. Die Diagnose ändert niemals den Ausführungsstatus, startet keinen Handler erneut und führt keine Wiederherstellung aus. Auf Plattformen ohne lesbares `/proc` bleibt der Status bewusst `unknown`.
+
 
 ---
 

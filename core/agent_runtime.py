@@ -20,6 +20,8 @@ from core.approval_manager import (
     ApprovalRecord,
 )
 
+from core.process_identity import current_process_identity
+
 MAX_PAYLOAD_BYTES = MAX_APPROVAL_PAYLOAD_BYTES
 
 
@@ -36,6 +38,8 @@ class ExecutionRecord:
     created_at: float
     finished_at: float | None = None
     error: str | None = None
+    owner_pid: int | None = None
+    owner_start_token: str | None = None
 
 
 AgentHandler = Callable[[dict[str, Any]], Any]
@@ -108,12 +112,15 @@ class AgentRuntime:
         execution_id = secrets.token_urlsafe(9)
         while execution_id in self.executions:
             execution_id = secrets.token_urlsafe(9)
+        owner_pid, owner_start_token = current_process_identity()
         record = ExecutionRecord(
             execution_id=execution_id,
             agent=agent,
             approval_id=approval_id,
             status="running",
             created_at=time.time(),
+            owner_pid=owner_pid,
+            owner_start_token=owner_start_token,
         )
         # Persist the consumed approval and running audit row in one transaction
         # before any trusted handler is invoked.

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from http.server import ThreadingHTTPServer
-from threading import Thread
+from threading import Event, Thread
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -201,6 +201,62 @@ def test_dashboard_audit_screen_has_search_status_filters_and_safe_rendering(tmp
             assert 'function renderAudit()' in script
             assert 'esc(item.error)' in script
     finally:
+        server.shutdown()
+        server.server_close()
+        worker.join(timeout=3)
+
+
+
+def test_dashboard_reports_active_process_for_running_execution(tmp_path, monkeypatch):
+    store, server, worker, base = _start_dashboard(monkeypatch, tmp_path)
+    runtime = dashboard_server.RUNTIME
+    started = Event()
+    release = Event()
+    result = {}
+
+    def slow_handler(payload):
+        started.set()
+        if not release.wait(timeout=5):
+            raise TimeoutError("Test handler release timed out")
+        return dashboard_server._create_task_action(payload)
+
+    runtime._handlers["task-assistant"] = slow_handler
+    try:
+        with _post(base, "/api/agent-actions/propose", {
+            "agent": "task-assistant",
+            "payload": {"title": "Running diagnostic", "priority": 3},
+        }) as response:
+            approval_id = json.loads(response.read())["approval"]["request_id"]
+        with _post(base, f"/api/approvals/{approval_id}/decision", {"decision": "approve"}):
+            pass
+
+        def execute():
+            try:
+                with _post(base, "/api/agent-executions", {
+                    "approval_id": approval_id,
+                    "agent": "task-assistant",
+                }) as response:
+                    result["body"] = json.loads(response.read())
+            except Exception as exc:  # pragma: no cover - asserted below
+                result["error"] = exc
+
+        execution_thread = Thread(target=execute, daemon=True)
+        execution_thread.start()
+        assert started.wait(timeout=3)
+
+        with urlopen(base + "/api/agent-executions", timeout=3) as response:
+            executions = json.loads(response.read())["executions"]
+        assert executions[0]["status"] == "running"
+        assert executions[0]["process_state"] == "active"
+
+        release.set()
+        execution_thread.join(timeout=3)
+        assert not execution_thread.is_alive()
+        assert "error" not in result
+        assert result["body"]["execution"]["status"] == "completed"
+        assert store.list()[0]["title"] == "Running diagnostic"
+    finally:
+        release.set()
         server.shutdown()
         server.server_close()
         worker.join(timeout=3)

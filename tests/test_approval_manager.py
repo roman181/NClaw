@@ -236,3 +236,53 @@ def test_approval_payload_is_copied_before_storage():
     assert manager.payload_for(request.request_id) == {
         "nested": {"value": "before"}
     }
+
+
+
+def test_running_execution_reports_process_state_without_exposing_pid(tmp_path):
+    from types import SimpleNamespace
+
+    from core.process_identity import current_process_identity
+
+    pid, start_token = current_process_identity()
+    manager = ApprovalManager(db_path=tmp_path / "approvals.sqlite3")
+    manager.save_execution(SimpleNamespace(
+        execution_id="exec-running",
+        agent="notes",
+        approval_id="approval-running",
+        status="running",
+        created_at=100.0,
+        finished_at=None,
+        error=None,
+        owner_pid=pid,
+        owner_start_token=start_token,
+    ))
+
+    record = manager.list_executions()[0]
+    assert record["process_state"] == ("active" if start_token else "unknown")
+    assert "owner_pid" not in record
+    assert "owner_start_token" not in record
+
+
+def test_legacy_execution_schema_migrates_without_losing_running_rows(tmp_path):
+    import sqlite3
+
+    database = tmp_path / "legacy-approvals.sqlite3"
+    with sqlite3.connect(database) as db:
+        db.execute(
+            """CREATE TABLE agent_executions (
+                execution_id TEXT PRIMARY KEY, agent TEXT NOT NULL,
+                approval_id TEXT NOT NULL, status TEXT NOT NULL,
+                created_at REAL NOT NULL, finished_at REAL, error TEXT
+            )"""
+        )
+        db.execute(
+            "INSERT INTO agent_executions VALUES(?,?,?,?,?,?,?)",
+            ("legacy-running", "notes", "approval-old", "running", 100.0, None, None),
+        )
+
+    manager = ApprovalManager(db_path=database)
+    records = manager.list_executions()
+    assert records[0]["execution_id"] == "legacy-running"
+    assert records[0]["status"] == "running"
+    assert records[0]["process_state"] == "unknown"

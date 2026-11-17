@@ -71,25 +71,31 @@ async function refreshApprovals(){
     }).join("");
   }catch(err){list.innerHTML='<div class="empty">Freigaben nicht verfügbar: '+esc(err.message)+'</div>'}
 }
+function executionStatusLabel(item){
+  if(item.status==="running"){
+    return ({active:"AKTIV",interrupted:"UNTERBROCHEN",unknown:"STATUS UNGEKLÄRT"})[item.process_state]||"STATUS UNGEKLÄRT";
+  }
+  return item.status==="completed"?"ERFOLGREICH":item.status==="failed"?"FEHLGESCHLAGEN":item.status.toUpperCase();
+}
 async function refreshExecutions(){
   const list=$("#execution-list");if(!list)return;
   try{
     const data=await api("/api/agent-executions");
     if(!data.executions.length){list.innerHTML='<div class="empty">Noch keine Agentenausführungen.</div>';return}
-    list.innerHTML=data.executions.map(item=>'<div class="execution-row"><div><b>'+esc(item.agent)+'</b><small>'+new Date(item.created_at*1000).toLocaleString("de-DE")+'</small></div><span class="approval-status '+esc(item.status)+'">'+esc(item.status==="completed"?"ERFOLGREICH":item.status==="failed"?"FEHLGESCHLAGEN":item.status.toUpperCase())+'</span></div>').join("");
+    list.innerHTML=data.executions.map(item=>'<div class="execution-row"><div><b>'+esc(item.agent)+'</b><small>'+new Date(item.created_at*1000).toLocaleString("de-DE")+'</small></div><span class="approval-status '+esc(item.status)+'">'+esc(executionStatusLabel(item))+'</span></div>').join("");
   }catch(err){list.innerHTML='<div class="empty">Ausführungsverlauf nicht verfügbar: '+esc(err.message)+'</div>'}
 }
 async function refreshControlledAgents(){await Promise.all([refreshApprovals(),refreshExecutions()])}
 
 let auditEntries=[];
-function auditStatusLabel(status){return ({pending:"Wartet auf Freigabe",approved:"Freigegeben · wartet auf Ausführung",rejected:"Abgelehnt",expired:"Abgelaufen",consumed:"Verbraucht",completed:"Erfolgreich",failed:"Fehlgeschlagen"})[status]||status}
+function auditStatusLabel(status,processState){if(status==="running")return ({active:"Aktiver Prozess",interrupted:"Prozess beendet · Lauf nicht abgeschlossen",unknown:"Prozessstatus nicht ermittelbar"})[processState]||"Prozessstatus nicht ermittelbar";return ({pending:"Wartet auf Freigabe",approved:"Freigegeben · wartet auf Ausführung",rejected:"Abgelehnt",expired:"Abgelaufen",consumed:"Verbraucht",completed:"Erfolgreich",failed:"Fehlgeschlagen"})[status]||status}
 function renderAudit(){
   const list=$("#audit-list"),query=($("#audit-search")?.value||"").trim().toLocaleLowerCase("de-DE"),status=$("#audit-status")?.value||"";
   if(!list)return;
-  const filtered=auditEntries.filter(item=>(!status||item.status===status)&&(!query||[item.kind,item.name,item.action,item.description,item.id,item.error,item.status].join(" ").toLocaleLowerCase("de-DE").includes(query)));
+  const filtered=auditEntries.filter(item=>(!status||item.status===status)&&(!query||[item.kind,item.name,item.action,item.description,item.id,item.error,item.status,item.processState].join(" ").toLocaleLowerCase("de-DE").includes(query)));
   $("#audit-count").textContent=filtered.length+" / "+auditEntries.length+" Einträge";
   if(!filtered.length){list.innerHTML='<div class="empty">Keine passenden Audit-Einträge gefunden.</div>';return}
-  list.innerHTML=filtered.map(item=>'<article class="audit-row"><div class="audit-marker '+esc(item.status)+'"></div><div class="audit-main"><div class="audit-title">'+esc(item.name)+'</div><div class="audit-meta">'+esc(item.kind)+' · '+esc(new Date(item.timestamp*1000).toLocaleString("de-DE"))+' · ID '+esc(item.id)+'</div>'+(item.description?'<p>'+esc(item.description)+'</p>':"")+(item.error?'<p class="audit-error">Fehler: '+esc(item.error)+'</p>':"")+'</div><span class="approval-status '+esc(item.status)+'">'+esc(auditStatusLabel(item.status))+'</span></article>').join("");
+  list.innerHTML=filtered.map(item=>'<article class="audit-row"><div class="audit-marker '+esc(item.status)+'"></div><div class="audit-main"><div class="audit-title">'+esc(item.name)+'</div><div class="audit-meta">'+esc(item.kind)+' · '+esc(new Date(item.timestamp*1000).toLocaleString("de-DE"))+' · ID '+esc(item.id)+'</div>'+(item.description?'<p>'+esc(item.description)+'</p>':"")+(item.error?'<p class="audit-error">Fehler: '+esc(item.error)+'</p>':"")+'</div><span class="approval-status '+esc(item.status)+'">'+esc(auditStatusLabel(item.status,item.processState))+'</span></article>').join("");
 }
 async function refreshAudit(){
   const list=$("#audit-list");if(!list)return;list.textContent="Audit-Verlauf wird geladen …";
@@ -97,7 +103,7 @@ async function refreshAudit(){
     const [approvals,executions]=await Promise.all([api("/api/approvals"),api("/api/agent-executions")]);
     auditEntries=[
       ...approvals.approvals.map(item=>({kind:"Freigabe",name:item.action,action:item.action,description:item.payload?.title?"Aufgabe: "+item.payload.title:item.description,id:item.request_id,status:item.status,timestamp:item.created_at})),
-      ...executions.executions.map(item=>({kind:"Agentenlauf",name:item.agent,action:item.agent,description:"Ausführung "+item.execution_id,error:item.error,id:item.execution_id,status:item.status,timestamp:item.created_at}))
+      ...executions.executions.map(item=>({kind:"Agentenlauf",name:item.agent,action:item.agent,description:"Ausführung "+item.execution_id,error:item.error,id:item.execution_id,status:item.status,processState:item.process_state,timestamp:item.created_at}))
     ].sort((a,b)=>b.timestamp-a.timestamp);
     renderAudit();
   }catch(err){list.innerHTML='<div class="empty">Audit-Verlauf nicht verfügbar: '+esc(err.message)+'</div>';$("#audit-count").textContent="Nicht verfügbar"}

@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from core.process_identity import execution_process_state
+
 MAX_APPROVAL_PAYLOAD_BYTES = 16 * 1024
 
 
@@ -55,10 +57,20 @@ class ApprovalManager:
                     CREATE TABLE IF NOT EXISTS agent_executions (
                         execution_id TEXT PRIMARY KEY, agent TEXT NOT NULL,
                         approval_id TEXT NOT NULL, status TEXT NOT NULL,
-                        created_at REAL NOT NULL, finished_at REAL, error TEXT
+                        created_at REAL NOT NULL, finished_at REAL, error TEXT,
+                        owner_pid INTEGER, owner_start_token TEXT
                     );
                     CREATE INDEX IF NOT EXISTS idx_executions_created ON agent_executions(created_at);
                 """)
+                columns = {
+                    row["name"] for row in db.execute("PRAGMA table_info(agent_executions)")
+                }
+                if "owner_pid" not in columns:
+                    db.execute("ALTER TABLE agent_executions ADD COLUMN owner_pid INTEGER")
+                if "owner_start_token" not in columns:
+                    db.execute(
+                        "ALTER TABLE agent_executions ADD COLUMN owner_start_token TEXT"
+                    )
             try:
                 self.db_path.chmod(0o600)
             except OSError:
@@ -294,6 +306,8 @@ class ApprovalManager:
             "created_at": record.created_at,
             "finished_at": record.finished_at,
             "error": record.error,
+            "owner_pid": getattr(record, "owner_pid", None),
+            "owner_start_token": getattr(record, "owner_start_token", None),
         }
         if item["approval_id"] != request_id:
             raise ValueError("Execution record must reference its approval")
@@ -371,7 +385,7 @@ class ApprovalManager:
                                 failure = TimeoutError("Approval request expired")
                         else:
                             db.execute(
-                                "INSERT INTO agent_executions VALUES(?,?,?,?,?,?,?)",
+                                "INSERT INTO agent_executions (execution_id, agent, approval_id, status, created_at, finished_at, error, owner_pid, owner_start_token) VALUES(?,?,?,?,?,?,?,?,?)",
                                 tuple(item.values()),
                             )
             if failure is not None:
@@ -384,6 +398,8 @@ class ApprovalManager:
             "approval_id": record.approval_id, "status": record.status,
             "created_at": record.created_at, "finished_at": record.finished_at,
             "error": record.error,
+            "owner_pid": getattr(record, "owner_pid", None),
+            "owner_start_token": getattr(record, "owner_start_token", None),
         }
         with self._lock:
             if self.db_path is None:
@@ -391,12 +407,36 @@ class ApprovalManager:
             else:
                 with self._connect() as db:
                     db.execute("""INSERT OR REPLACE INTO agent_executions
-                        VALUES(?,?,?,?,?,?,?)""", tuple(item.values()))
+                        (execution_id, agent, approval_id, status, created_at, finished_at, error, owner_pid, owner_start_token)
+                        VALUES(?,?,?,?,?,?,?,?,?)""", tuple(item.values()))
 
     def list_executions(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Return recent executions with a read-only process-liveness diagnosis."""
         with self._lock:
             if self.db_path is None:
-                return sorted(self._executions.values(), key=lambda r: r["created_at"], reverse=True)[:limit]
-            with self._connect() as db:
-                rows = db.execute("SELECT * FROM agent_executions ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
-            return [dict(row) for row in rows]
+                records = sorted(
+                    (dict(item) for item in self._executions.values()),
+                    key=lambda item: item["created_at"],
+                    reverse=True,
+                )[:limit]
+            else:
+                with self._connect() as db:
+                    rows = db.execute(
+                        "SELECT * FROM agent_executions ORDER BY created_at DESC LIMIT ?",
+                        (limit,),
+                    ).fetchall()
+                records = [dict(row) for row in rows]
+
+        for item in records:
+            item["process_state"] = (
+                execution_process_state(
+                    item.get("owner_pid"),
+                    item.get("owner_start_token"),
+                )
+                if item["status"] == "running"
+                else None
+            )
+            # Process identifiers are internal diagnostics, not dashboard data.
+            item.pop("owner_pid", None)
+            item.pop("owner_start_token", None)
+        return records
