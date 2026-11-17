@@ -19,7 +19,6 @@ from core.approval_manager import (
     ApprovalManager,
     ApprovalRecord,
 )
-
 from core.process_identity import current_process_identity
 
 MAX_PAYLOAD_BYTES = MAX_APPROVAL_PAYLOAD_BYTES
