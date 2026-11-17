@@ -747,6 +747,7 @@ Phase 6 – Dashboard
 
 - [ ] Nexus Chat
 - [x] Agentenstatus (lokale Ollama-Erreichbarkeit; Statusprüfung ohne Modellstart)
+- [x] Read-only Diagnose verwaister Agentenläufe über Prozesskennung (Linux/Android; keine automatische Wiederaufnahme)
 - [ ] Start/Stop-Lernschleife
 - [ ] Skill-Verwaltung
 - [ ] Einstellungen
