@@ -237,7 +237,7 @@ def test_dashboard_reports_active_process_for_running_execution(tmp_path, monkey
                     "agent": "task-assistant",
                 }) as response:
                     result["body"] = json.loads(response.read())
-            except (HTTPError, URLError, TimeoutError, OSError, ValueError, RuntimeError) as exc:  # pragma: no cover - asserted below
+            except (HTTPError, TimeoutError, OSError, ValueError, RuntimeError) as exc:  # pragma: no cover - asserted below
                 result["error"] = exc
 
         execution_thread = Thread(target=execute, daemon=True)
