@@ -20,7 +20,7 @@ def test_import_text_file_and_inspect(tmp_path):
     agent = SandmannAgent(LocalSandbox(tmp_path / "data"))
     imported = agent.import_file(source)
     assert imported["status"] == "incoming"
-    assert imported["size"] == len("Hallo NClaw".encode("utf-8"))
+    assert imported["size"] == len(b"Hallo NClaw")
     assert imported["sha256"] == hashlib.sha256(b"Hallo NClaw").hexdigest()
     result = agent.inspect(imported["path"])
     assert result["text"] == "Hallo NClaw"
