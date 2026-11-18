@@ -520,7 +520,7 @@ python -m agents.sandmann inspect ~/.nclaw/incoming/DATEI
 python -m agents.sandmann approve ~/.nclaw/incoming/DATEI
 ```
 
-ZIP-Dateien werden nur auf Einträge und Sicherheitsmerkmale geprüft, nicht entpackt. Unbekannte Formate werden quarantänisiert. Quellcode wird als Text betrachtet und nicht ausgeführt.
+ZIP-Dateien werden nur auf Einträge und Sicherheitsmerkmale geprüft, nicht entpackt. Unbekannte Formate werden quarantänisiert. Quellcode wird als Text betrachtet und nicht ausgeführt. Der Dateiimport prüft die tatsächlich gelesene Datenmenge, kopiert zunächst in eine temporäre Datei und veröffentlicht den Import erst nach vollständigem, unverändertem Kopieren atomar. Bei Fehlern werden eigene Teildateien entfernt; das 100-MiB-Limit gilt auch bei einer während des Imports wachsenden Quelldatei.
 
 ### Google Drive als optionaler Cloud-Speicher
 

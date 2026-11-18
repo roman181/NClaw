@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
+import stat
 import uuid
 from pathlib import Path
 
@@ -45,27 +46,92 @@ class LocalSandbox:
 
     def import_file(self, source: str | Path) -> dict[str, str | int]:
         source_path = Path(source).expanduser()
-        if source_path.is_symlink() or not source_path.is_file():
+        if source_path.is_symlink():
             raise ValueError("Only regular, non-symlink files can be imported")
-        size = source_path.stat().st_size
-        if size <= 0 or size > MAX_IMPORT_BYTES:
-            raise ValueError("File must be between 1 byte and 100 MiB")
-        suffix = source_path.suffix.lower()
-        trusted_type = suffix in ALLOWED_TEXT_SUFFIXES | ALLOWED_DOCUMENT_SUFFIXES
-        target_folder = self.folder("incoming" if trusted_type else "quarantine")
-        file_id = uuid.uuid4().hex
-        safe_name = "".join(ch for ch in source_path.name if ch.isalnum() or ch in "._-")[:100]
-        if not safe_name or safe_name in {".", ".."}:
-            safe_name = "import.bin"
-        target = target_folder / f"{file_id}_{safe_name}"
-        digest = hashlib.sha256()
-        with source_path.open("rb") as src, target.open("xb") as dst:
-            while chunk := src.read(1024 * 1024):
-                digest.update(chunk)
-                dst.write(chunk)
-        target.chmod(0o600)
-        return {"id": file_id, "name": safe_name, "path": str(target), "size": size,
-                "sha256": digest.hexdigest(), "status": "incoming" if trusted_type else "quarantine"}
+
+        # O_NOFOLLOW closes the gap between the symlink check and opening the
+        # source on Linux/Android. fstat then verifies the opened descriptor.
+        flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            source_fd = os.open(source_path, flags)
+        except OSError as exc:
+            raise ValueError("Only regular, non-symlink files can be imported") from exc
+
+        try:
+            source_info = os.fstat(source_fd)
+            if not stat.S_ISREG(source_info.st_mode):
+                raise ValueError("Only regular, non-symlink files can be imported")
+            if source_info.st_size <= 0 or source_info.st_size > MAX_IMPORT_BYTES:
+                raise ValueError(
+                    f"File must be between 1 byte and {MAX_IMPORT_BYTES} bytes"
+                )
+
+            suffix = source_path.suffix.lower()
+            trusted_type = suffix in ALLOWED_TEXT_SUFFIXES | ALLOWED_DOCUMENT_SUFFIXES
+            target_folder = self.folder("incoming" if trusted_type else "quarantine")
+            if target_folder.is_symlink() or not target_folder.resolve().is_relative_to(self.root):
+                raise ValueError("Unsafe sandbox destination folder")
+
+            file_id = uuid.uuid4().hex
+            safe_name = "".join(
+                ch for ch in source_path.name if ch.isalnum() or ch in "._-"
+            )[:100]
+            if not safe_name or safe_name in {".", ".."}:
+                safe_name = "import.bin"
+
+            target = target_folder / f"{file_id}_{safe_name}"
+            temporary = target_folder / f".{file_id}.part"
+            digest = hashlib.sha256()
+            copied = 0
+
+            try:
+                source_stream = os.fdopen(source_fd, "rb")
+                source_fd = -1
+                with source_stream as src:
+                    with temporary.open("xb") as dst:
+                        while chunk := src.read(1024 * 1024):
+                            copied += len(chunk)
+                            if copied > MAX_IMPORT_BYTES:
+                                raise ValueError("File exceeds the import size limit")
+                            digest.update(chunk)
+                            dst.write(chunk)
+                        dst.flush()
+                        os.fsync(dst.fileno())
+
+                    final_info = os.fstat(src.fileno())
+                    source_changed = (
+                        copied != source_info.st_size
+                        or final_info.st_size != source_info.st_size
+                        or final_info.st_dev != source_info.st_dev
+                        or final_info.st_ino != source_info.st_ino
+                        or final_info.st_mtime_ns != source_info.st_mtime_ns
+                        or final_info.st_ctime_ns != source_info.st_ctime_ns
+                    )
+                    if source_changed:
+                        raise ValueError("Source changed during import")
+
+                temporary.chmod(0o600)
+                # The temporary file is in the same directory, so publishing
+                # the completed copy is an atomic rename on the local filesystem.
+                os.replace(temporary, target)
+            except Exception:
+                try:
+                    temporary.unlink()
+                except FileNotFoundError:
+                    pass
+                raise
+        finally:
+            if source_fd >= 0:
+                os.close(source_fd)
+
+        return {
+            "id": file_id,
+            "name": safe_name,
+            "path": str(target),
+            "size": copied,
+            "sha256": digest.hexdigest(),
+            "status": "incoming" if trusted_type else "quarantine",
+        }
 
     def move_to(self, source: str | Path, destination: str) -> Path:
         candidate = Path(source)
