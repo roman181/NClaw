@@ -157,15 +157,15 @@ class LocalSandbox:
                     if source_changed:
                         raise ValueError("Source changed during import")
 
-                os.link(
-                    temporary_name,
+                reservation_fd = os.open(
                     target_name,
-                    src_dir_fd=folder_fd,
-                    dst_dir_fd=folder_fd,
-                    follow_symlinks=False,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                    0o600,
+                    dir_fd=folder_fd,
                 )
+                os.close(reservation_fd)
                 target_published = True
-                os.unlink(temporary_name, dir_fd=folder_fd)
+                os.replace(temporary_name, target_name, src_dir_fd=folder_fd, dst_dir_fd=folder_fd)
                 temporary_created = False
                 try:
                     os.fsync(folder_fd)
@@ -263,15 +263,15 @@ class LocalSandbox:
             ):
                 raise ValueError("Source changed during move")
 
-            os.link(
-                temporary_name,
+            reservation_fd = os.open(
                 target_name,
-                src_dir_fd=target_dir_fd,
-                dst_dir_fd=target_dir_fd,
-                follow_symlinks=False,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+                0o600,
+                dir_fd=target_dir_fd,
             )
+            os.close(reservation_fd)
             target_published = True
-            os.unlink(temporary_name, dir_fd=target_dir_fd)
+            os.replace(temporary_name, target_name, src_dir_fd=target_dir_fd, dst_dir_fd=target_dir_fd)
             temporary_created = False
             os.unlink(target_name, dir_fd=source_dir_fd)
             source_removed = True
