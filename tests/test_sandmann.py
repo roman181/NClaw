@@ -1,6 +1,7 @@
 """Tests for local sandbox intake and safe archive inspection."""
 import hashlib
 import os
+from pathlib import Path
 import zipfile
 
 import pytest
@@ -115,3 +116,48 @@ def test_move_only_accepts_files_inside_sandbox(tmp_path):
     imported = storage.import_file(source)
     moved = storage.move_to(imported["path"], "approved")
     assert moved.parent == storage.folder("approved")
+
+
+def test_move_rejects_symlinked_destination_folder(tmp_path):
+    storage = LocalSandbox(tmp_path / "data")
+    source = tmp_path / "note.txt"
+    source.write_text("keep", encoding="utf-8")
+    imported = storage.import_file(source)
+    approved = storage.root / "approved"
+    approved.rmdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    approved.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="Unsafe sandbox folder"):
+        storage.move_to(imported["path"], "approved")
+
+    assert Path(imported["path"]).read_text(encoding="utf-8") == "keep"
+    assert list(outside.iterdir()) == []
+
+
+def test_move_does_not_overwrite_existing_destination(tmp_path):
+    storage = LocalSandbox(tmp_path / "data")
+    source = tmp_path / "note.txt"
+    source.write_text("source", encoding="utf-8")
+    imported = storage.import_file(source)
+    target = storage.folder("approved") / Path(imported["path"]).name
+    target.write_text("existing", encoding="utf-8")
+
+    with pytest.raises(FileExistsError):
+        storage.move_to(imported["path"], "approved")
+
+    assert Path(imported["path"]).read_text(encoding="utf-8") == "source"
+    assert target.read_text(encoding="utf-8") == "existing"
+
+
+def test_folder_rejects_symlink(tmp_path):
+    storage = LocalSandbox(tmp_path / "data")
+    folder = storage.root / "incoming"
+    folder.rmdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    folder.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="Unsafe sandbox folder"):
+        storage.folder("incoming")
