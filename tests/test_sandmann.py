@@ -1,8 +1,8 @@
 """Tests for local sandbox intake and safe archive inspection."""
 import hashlib
 import os
-from pathlib import Path
 import zipfile
+from pathlib import Path
 
 import pytest
 
