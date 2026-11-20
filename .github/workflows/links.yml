@@ -17,18 +17,11 @@ jobs:
         with:
           args: >-
             --no-progress
-            --exclude '^http://127[.]0[.]0[.]1:11434/?$'
-            --exclude '^http://192[.]168[.]1[.]50:11434/?$'
-            --exclude '^https://theresanaiforthat[.]com/?$'
-            --exclude '^https://www[.]onlinegdb[.]com/?
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            # This reference site returns HTTP 402 to automated link checkers.
-            --exclude '^https://deeprepo[.]dev/?
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+            --exclude '127[.]0[.]0[.]1:11434'
+            --exclude '192[.]168[.]1[.]50:11434'
+            --exclude 'theresanaiforthat[.]com'
+            --exclude 'onlinegdb[.]com'
+            --exclude 'deeprepo[.]dev'
             README.md SECURITY.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
