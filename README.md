@@ -522,6 +522,8 @@ python -m agents.sandmann approve ~/.nclaw/incoming/DATEI
 
 ZIP-Dateien werden nur auf Einträge und Sicherheitsmerkmale geprüft, nicht entpackt. Unbekannte Formate werden quarantänisiert. Quellcode wird als Text betrachtet und nicht ausgeführt. Der Dateiimport prüft die tatsächlich gelesene Datenmenge, kopiert zunächst in eine temporäre Datei und veröffentlicht den Import erst nach vollständigem, unverändertem Kopieren atomar. Bei Fehlern werden eigene Teildateien entfernt; das 100-MiB-Limit gilt auch bei einer während des Imports wachsenden Quelldatei.
 
+Sandbox-Verzeichnisse werden bei jedem Zugriff auf Symlinks und Pfadausbrüche geprüft und über geöffnete Verzeichnisdeskriptoren gebunden. Import und Verschieben veröffentlichen Dateien erst nach vollständigem Kopieren; bestehende Ziele werden nicht überschrieben. Das Verschieben prüft außerdem, dass die Quelldatei während des Kopierens unverändert bleibt. Dateien über 100 MiB werden nicht verschoben.
+
 ### Google Drive als optionaler Cloud-Speicher
 
 Die Google-Drive-Anbindung verwendet NClaws eigene OAuth-Anmeldung. Sie ist unabhängig von einer ChatGPT-Drive-Verbindung. Nur Dateien aus `approved/` können hochgeladen werden; es gibt keine automatische Synchronisierung und keinen Upload von `incoming/` oder `quarantine/`.
