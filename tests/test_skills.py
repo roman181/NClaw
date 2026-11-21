@@ -116,3 +116,17 @@ def test_missing_integrity_digest_fails_closed(tmp_path):
 
     with pytest.raises(ValueError, match="Integritätsnachweis fehlt"):
         registry.verify_integrity("github-review", "1.0.0")
+
+
+def test_status_tampering_fails_integrity_check(tmp_path):
+    registry = SkillRegistry(tmp_path / "data")
+    path = make_draft(registry)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["status"] = "approved"
+    payload["tests_passed"] = True
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Integritätsprüfung"):
+        registry.verify_integrity("github-review", "1.0.0")
+    with pytest.raises(ValueError, match="Integritätsprüfung"):
+        registry.list_active()
