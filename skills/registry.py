@@ -42,9 +42,12 @@ class SkillRegistry:
 
     @staticmethod
     def _integrity_digest(payload: dict[str, object]) -> str:
-        immutable = {field: payload[field] for field in INTEGRITY_FIELDS}
+        covered = {
+            key: value for key, value in payload.items()
+            if key != "integrity_sha256"
+        }
         canonical = json.dumps(
-            immutable,
+            covered,
             ensure_ascii=False,
             sort_keys=True,
             separators=(",", ":"),
@@ -147,6 +150,7 @@ class SkillRegistry:
             raise ValueError("Testzusammenfassung muss 1 bis 1000 Zeichen lang sein")
         payload["tests_passed"] = bool(passed)
         payload["test_summary"] = summary.strip()
+        payload["integrity_sha256"] = self._integrity_digest(payload)
         self._write(path, payload)
         return payload
 
@@ -161,6 +165,7 @@ class SkillRegistry:
             raise PermissionError("Skill benötigt zuerst einen erfolgreichen Test")
         payload["status"] = "approved"
         payload["approved_at"] = datetime.now(timezone.utc).isoformat()  # noqa: UP017
+        payload["integrity_sha256"] = self._integrity_digest(payload)
         self._write(path, payload)
         return payload
 
@@ -170,6 +175,7 @@ class SkillRegistry:
         if payload.get("status") != "pending_approval":
             raise ValueError("Nur ausstehende Skills können abgelehnt werden")
         payload["status"] = "rejected"
+        payload["integrity_sha256"] = self._integrity_digest(payload)
         self._write(path, payload)
         return payload
 
