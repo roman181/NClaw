@@ -1,6 +1,8 @@
 """Local metadata-only skill registry; skill instructions are never executed as code."""
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -11,6 +13,16 @@ from pathlib import Path
 SKILL_ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,63}$")
 SEMVER = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 MAX_INSTRUCTIONS = 20_000
+INTEGRITY_FIELDS = (
+    "schema_version",
+    "skill_id",
+    "name",
+    "version",
+    "description",
+    "instructions",
+    "source",
+    "created_at",
+)
 
 
 class SkillRegistry:
@@ -29,13 +41,41 @@ class SkillRegistry:
         return self.directory / skill_id / f"{version}.json"
 
     @staticmethod
+    def _integrity_digest(payload: dict[str, object]) -> str:
+        covered = {
+            key: value for key, value in payload.items()
+            if key != "integrity_sha256"
+        }
+        canonical = json.dumps(
+            covered,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    @staticmethod
     def _read(path: Path) -> dict[str, object]:
         if path.is_symlink() or not path.is_file():
             raise ValueError("Skill-Datei fehlt oder ist unsicher")
         payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
             raise TypeError("Ungültiges Skill-Format")
+        if any(field not in payload for field in INTEGRITY_FIELDS):
+            raise ValueError("Skill-Integritätsnachweis fehlt; Version neu anlegen")
+        stored_digest = payload.get("integrity_sha256")
+        if not isinstance(stored_digest, str) or not re.fullmatch(r"[0-9a-f]{64}", stored_digest):
+            raise ValueError("Skill-Integritätsnachweis fehlt oder ist ungültig")
+        expected_digest = SkillRegistry._integrity_digest(payload)
+        if not hmac.compare_digest(stored_digest, expected_digest):
+            raise ValueError("Skill-Integritätsprüfung fehlgeschlagen")
         return payload
+
+    def verify_integrity(self, skill_id: str, version: str) -> bool:
+        """Verify immutable skill metadata; raise ValueError on missing or changed data."""
+        self._read(self._skill_path(skill_id, version))
+        return True
 
     @staticmethod
     def _write(path: Path, payload: dict[str, object]) -> None:
@@ -97,6 +137,7 @@ class SkillRegistry:
             "test_summary": "Noch nicht getestet",
             "approved_at": None,
         }
+        payload["integrity_sha256"] = self._integrity_digest(payload)
         self._write(target, payload)
         return target
 
@@ -109,6 +150,7 @@ class SkillRegistry:
             raise ValueError("Testzusammenfassung muss 1 bis 1000 Zeichen lang sein")
         payload["tests_passed"] = bool(passed)
         payload["test_summary"] = summary.strip()
+        payload["integrity_sha256"] = self._integrity_digest(payload)
         self._write(path, payload)
         return payload
 
@@ -123,6 +165,7 @@ class SkillRegistry:
             raise PermissionError("Skill benötigt zuerst einen erfolgreichen Test")
         payload["status"] = "approved"
         payload["approved_at"] = datetime.now(timezone.utc).isoformat()  # noqa: UP017
+        payload["integrity_sha256"] = self._integrity_digest(payload)
         self._write(path, payload)
         return payload
 
@@ -132,6 +175,7 @@ class SkillRegistry:
         if payload.get("status") != "pending_approval":
             raise ValueError("Nur ausstehende Skills können abgelehnt werden")
         payload["status"] = "rejected"
+        payload["integrity_sha256"] = self._integrity_digest(payload)
         self._write(path, payload)
         return payload
 

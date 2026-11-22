@@ -1,4 +1,6 @@
 """Skill versions stay inert until tests pass and explicit approval is recorded."""
+import json
+
 import pytest
 
 from skills.registry import SkillRegistry
@@ -67,3 +69,64 @@ def test_skill_ids_and_versions_are_validated(tmp_path):
             skill_id="valid-skill", name="Bad", version="latest",
             description="Bad", instructions="No execution",
         )
+
+
+def test_draft_records_integrity_digest(tmp_path):
+    registry = SkillRegistry(tmp_path / "data")
+    path = make_draft(registry)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+
+    assert len(payload["integrity_sha256"]) == 64
+    assert registry.verify_integrity("github-review", "1.0.0") is True
+
+
+def test_integrity_remains_valid_across_test_and_approval_updates(tmp_path):
+    registry = SkillRegistry(tmp_path / "data")
+    make_draft(registry)
+    registry.record_test_result(
+        "github-review", "1.0.0", passed=True, summary="Metadata-only tests passed"
+    )
+    registry.approve("github-review", "1.0.0", approved=True)
+
+    assert registry.verify_integrity("github-review", "1.0.0") is True
+    assert len(registry.list_active()) == 1
+
+
+def test_modified_skill_content_fails_integrity_check(tmp_path):
+    registry = SkillRegistry(tmp_path / "data")
+    path = make_draft(registry)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["instructions"] = "Changed after draft creation"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Integritätsprüfung"):
+        registry.verify_integrity("github-review", "1.0.0")
+    with pytest.raises(ValueError, match="Integritätsprüfung"):
+        registry.record_test_result(
+            "github-review", "1.0.0", passed=True, summary="Must not be accepted"
+        )
+
+
+def test_missing_integrity_digest_fails_closed(tmp_path):
+    registry = SkillRegistry(tmp_path / "data")
+    path = make_draft(registry)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload.pop("integrity_sha256")
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Integritätsnachweis fehlt"):
+        registry.verify_integrity("github-review", "1.0.0")
+
+
+def test_status_tampering_fails_integrity_check(tmp_path):
+    registry = SkillRegistry(tmp_path / "data")
+    path = make_draft(registry)
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["status"] = "approved"
+    payload["tests_passed"] = True
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Integritätsprüfung"):
+        registry.verify_integrity("github-review", "1.0.0")
+    with pytest.raises(ValueError, match="Integritätsprüfung"):
+        registry.list_active()
