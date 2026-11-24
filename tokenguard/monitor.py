@@ -36,13 +36,37 @@ class TokenGuard:
             raise ValueError("Token threshold must be between 0.1 and 1.0")
 
     @staticmethod
+    def _is_cjk(character: str) -> bool:
+        codepoint = ord(character)
+        return (
+            0x2E80 <= codepoint <= 0x2FFF
+            or 0x3000 <= codepoint <= 0x30FF
+            or 0x3100 <= codepoint <= 0x31FF
+            or 0x3400 <= codepoint <= 0x4DBF
+            or 0x4E00 <= codepoint <= 0x9FFF
+            or 0xA960 <= codepoint <= 0xA97F
+            or 0xAC00 <= codepoint <= 0xD7AF
+            or 0xF900 <= codepoint <= 0xFAFF
+            or 0xFF00 <= codepoint <= 0xFFEF
+            or 0x20000 <= codepoint <= 0x3134F
+        )
+
+    @staticmethod
     def estimate_tokens(text: str) -> int:
         if not text:
             return 0
-        byte_estimate = math.ceil(len(text.encode("utf-8")) / 4)
-        lexical_units = re.findall(r"\w+|[^\w\s]", text, flags=re.UNICODE)
+
+        cjk_characters = sum(TokenGuard._is_cjk(character) for character in text)
+        non_cjk = "".join(character for character in text if not TokenGuard._is_cjk(character))
+        byte_estimate = math.ceil(len(non_cjk.encode("utf-8")) / 4)
+        lexical_units = re.findall(r"\w+|[^\w\s]", non_cjk, flags=re.UNICODE)
         lexical_estimate = math.ceil(len(lexical_units) * 1.3)
-        return max(byte_estimate, lexical_estimate)
+        non_cjk_estimate = max(byte_estimate, lexical_estimate)
+
+        # CJK text often has no whitespace boundaries. Budget at least 1.5
+        # estimated tokens per CJK code point rather than one per whole run.
+        cjk_estimate = math.ceil(cjk_characters * 1.5)
+        return non_cjk_estimate + cjk_estimate
 
     def check(self, prompt: str, system: str | None = None) -> TokenCheck:
         combined = f"{system or ''}\n{prompt}"
