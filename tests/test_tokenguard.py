@@ -27,6 +27,22 @@ def test_token_guard_rejects_invalid_configuration():
         TokenGuard(context_window=4096, threshold=0.05)
 
 
+@pytest.mark.parametrize("text", ["汉" * 100, "あ" * 100, "한" * 100])
+def test_token_guard_conservatively_counts_cjk_without_spaces(text):
+    assert TokenGuard.estimate_tokens(text) >= 150
+
+
+def test_token_guard_counts_mixed_cjk_and_latin_text():
+    mixed = "Analyze " + "漢字" * 50 + " repository"
+    estimate = TokenGuard.estimate_tokens(mixed)
+    assert estimate >= 150
+    assert estimate > TokenGuard.estimate_tokens("Analyze repository")
+
+
+def test_token_guard_keeps_empty_text_at_zero():
+    assert TokenGuard.estimate_tokens("") == 0
+
+
 def test_handoff_is_private_json_inside_metadata(tmp_path):
     store = HandoffStore(tmp_path / "nclaw")
     path = store.create(
