@@ -58,7 +58,9 @@ class TokenGuard:
 
         cjk_characters = sum(TokenGuard._is_cjk(character) for character in text)
         non_cjk = "".join(character for character in text if not TokenGuard._is_cjk(character))
-        byte_estimate = math.ceil(len(non_cjk.encode("utf-8")) / 4)
+        # Untrusted text can contain lone UTF-16 surrogates (for example, from
+        # escaped JSON). Replace them for byte budgeting instead of crashing.
+        byte_estimate = math.ceil(len(non_cjk.encode("utf-8", errors="replace")) / 4)
         lexical_units = re.findall(r"\w+|[^\w\s]", non_cjk, flags=re.UNICODE)
         lexical_estimate = math.ceil(len(lexical_units) * 1.3)
         non_cjk_estimate = max(byte_estimate, lexical_estimate)
