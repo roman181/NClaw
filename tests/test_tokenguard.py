@@ -39,6 +39,12 @@ def test_token_guard_counts_mixed_cjk_and_latin_text():
     assert estimate > TokenGuard.estimate_tokens("Analyze repository")
 
 
+@pytest.mark.parametrize("text", ["\ud800", "before\udfffafter", "\ud800\udfff"])
+def test_token_guard_handles_unpaired_surrogates(text):
+    estimate = TokenGuard.estimate_tokens(text)
+    assert estimate >= 1
+
+
 def test_token_guard_keeps_empty_text_at_zero():
     assert TokenGuard.estimate_tokens("") == 0
 
