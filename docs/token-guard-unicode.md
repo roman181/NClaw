@@ -8,6 +8,10 @@ Texte ohne Leerzeichen, insbesondere Chinesisch, Japanisch und Koreanisch, könn
 
 Die Erkennung umfasst CJK-Zeichen, Kana, Hangul sowie gebräuchliche CJK-Kompatibilitäts- und Erweiterungsbereiche. Gemischte Texte werden ebenfalls berücksichtigt.
 
+## Fehlerhafte Unicode-Eingaben
+
+Eingehender Text kann einzelne UTF-16-Surrogate enthalten, etwa durch escaped JSON-Daten. Solche Codepoints sind keine gültigen UTF-8-Skalarwerte. TokenGuard ersetzt sie ausschließlich für die Byte-Schätzung durch das standardisierte UTF-8-Ersatzzeichen, statt die Schätzung mit `UnicodeEncodeError` abzubrechen. Der ursprüngliche Prompt wird dadurch nicht verändert.
+
 ## Grenzen und Sicherheitsverhalten
 
 - Die Schätzung ist absichtlich konservativ und kann den Bedarf überschätzen.
