@@ -7,18 +7,18 @@ import stat
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 
 class HandoffStore:
     """Store version-1 handoffs locally; loading never resumes execution."""
 
     MAX_HANDOFF_BYTES = 64 * 1024
-    _FIELDS = {
+    _FIELDS: ClassVar[frozenset[str]] = frozenset({
         "schema_version", "handoff_id", "created_at", "project", "model",
         "goal", "estimated_tokens", "context_window", "usage_ratio",
         "status", "notes",
-    }
+    })
 
     def __init__(self, sandbox_root: str | Path) -> None:
         self.root = Path(sandbox_root).expanduser().resolve()
