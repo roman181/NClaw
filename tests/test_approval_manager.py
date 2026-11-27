@@ -286,3 +286,15 @@ def test_legacy_execution_schema_migrates_without_losing_running_rows(tmp_path):
     assert records[0]["execution_id"] == "legacy-running"
     assert records[0]["status"] == "running"
     assert records[0]["process_state"] == "unknown"
+
+@pytest.mark.parametrize("limit", [0, -1, 201, True, 1.5, "10"])
+def test_execution_history_limit_is_bounded(tmp_path, limit):
+    manager = ApprovalManager(db_path=tmp_path / "approvals.sqlite3")
+    with pytest.raises(ValueError, match="between 1 and 200"):
+        manager.list_executions(limit)
+
+
+def test_execution_history_accepts_maximum_limit(tmp_path):
+    manager = ApprovalManager(db_path=tmp_path / "approvals.sqlite3")
+    assert manager.list_executions(200) == []
+
