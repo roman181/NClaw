@@ -140,9 +140,10 @@ def test_handoff_load_rejects_symlink_file(tmp_path):
         goal="task", model="llama3.2", estimated_tokens=10,
         context_window=1000, usage_ratio=0.01,
     )
+    handoff_id = path.stem.removeprefix("handoff-")
     outside = tmp_path / "outside.json"
     outside.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
     path.unlink()
     path.symlink_to(outside)
     with pytest.raises(ValueError, match="unavailable or unsafe"):
-        store.load(path.stem.removeprefix("handoff-"))
+        store.load(handoff_id)
