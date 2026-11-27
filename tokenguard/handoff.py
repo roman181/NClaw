@@ -101,7 +101,11 @@ class HandoffStore:
             if type(value) is not int or value < minimum:
                 raise ValueError(f"Invalid handoff {field}")
         ratio = payload["usage_ratio"]
-        if isinstance(ratio, bool) or not isinstance(ratio, (int, float)) or not 0 <= ratio <= 10:
+        if (
+            isinstance(ratio, bool)
+            or not isinstance(ratio, (int, float))
+            or not 0 <= ratio <= 10
+        ):
             raise ValueError("Invalid handoff usage ratio")
         try:
             datetime.fromisoformat(payload["created_at"])
