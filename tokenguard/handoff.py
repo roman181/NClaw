@@ -122,22 +122,27 @@ class HandoffStore:
             raise ValueError("Invalid handoff ID") from None
         if normalized_id != handoff_id:
             raise ValueError("Invalid handoff ID")
-        metadata = self.root / "metadata"
-        if metadata.is_symlink() or self.directory.is_symlink():
-            raise ValueError("Unsafe handoff directory")
-        if not self.directory.resolve().is_relative_to(self.root):
-            raise ValueError("Handoff directory escaped local data root")
-        target = self.directory / f"handoff-{normalized_id}.json"
         flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0)
+        directory_flags = flags | getattr(os, "O_DIRECTORY", 0)
+        metadata_fd = handoffs_fd = descriptor = None
         try:
-            descriptor = os.open(target, flags)
-        except OSError as exc:
-            raise ValueError("Handoff file is unavailable or unsafe") from exc
-        with os.fdopen(descriptor, "rb") as stream:
-            info = os.fstat(stream.fileno())
+            metadata_fd = os.open(self.root / "metadata", directory_flags)
+            handoffs_fd = os.open("handoffs", directory_flags, dir_fd=metadata_fd)
+            descriptor = os.open(
+                f"handoff-{normalized_id}.json", flags, dir_fd=handoffs_fd
+            )
+            info = os.fstat(descriptor)
             if not stat.S_ISREG(info.st_mode) or info.st_size > self.MAX_HANDOFF_BYTES:
                 raise ValueError("Invalid handoff file type or size")
-            raw = stream.read(self.MAX_HANDOFF_BYTES + 1)
+            with os.fdopen(descriptor, "rb") as stream:
+                descriptor = None
+                raw = stream.read(self.MAX_HANDOFF_BYTES + 1)
+        except OSError as exc:
+            raise ValueError("Handoff file is unavailable or unsafe") from exc
+        finally:
+            for fd in (descriptor, handoffs_fd, metadata_fd):
+                if fd is not None:
+                    os.close(fd)
         if len(raw) > self.MAX_HANDOFF_BYTES:
             raise ValueError("Handoff file exceeds size limit")
         try:
