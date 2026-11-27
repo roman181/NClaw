@@ -76,3 +76,73 @@ def test_handoff_rejects_symlinked_metadata(tmp_path):
             goal="task", model="llama3.2", estimated_tokens=10,
             context_window=1000, usage_ratio=0.01,
         )
+
+
+def test_handoff_load_validates_versioned_payload_without_resuming(tmp_path):
+    store = HandoffStore(tmp_path / "nclaw")
+    path = store.create(
+        goal="Continue analysis", model="llama3.2", estimated_tokens=920,
+        context_window=1000, usage_ratio=0.92,
+    )
+    handoff_id = path.stem.removeprefix("handoff-")
+    payload = store.load(handoff_id)
+    assert payload["goal"] == "Continue analysis"
+    assert payload["status"] == "waiting_for_manual_resume"
+
+
+@pytest.mark.parametrize("handoff_id", ["../outside", "not-a-uuid", ""])
+def test_handoff_load_rejects_invalid_ids(tmp_path, handoff_id):
+    with pytest.raises(ValueError, match="ID"):
+        HandoffStore(tmp_path / "nclaw").load(handoff_id)
+
+
+def test_handoff_load_rejects_unknown_schema_version(tmp_path):
+    store = HandoffStore(tmp_path / "nclaw")
+    path = store.create(
+        goal="task", model="llama3.2", estimated_tokens=10,
+        context_window=1000, usage_ratio=0.01,
+    )
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["schema_version"] = 2
+    path.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError, match="schema"):
+        store.load(data["handoff_id"])
+
+
+def test_handoff_load_rejects_duplicate_json_keys(tmp_path):
+    store = HandoffStore(tmp_path / "nclaw")
+    path = store.create(
+        goal="task", model="llama3.2", estimated_tokens=10,
+        context_window=1000, usage_ratio=0.01,
+    )
+    data = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(
+        json.dumps(data)[:-1] + ', "goal": "tampered"}', encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="Malformed"):
+        store.load(data["handoff_id"])
+
+
+def test_handoff_load_rejects_oversized_file(tmp_path):
+    store = HandoffStore(tmp_path / "nclaw")
+    path = store.create(
+        goal="task", model="llama3.2", estimated_tokens=10,
+        context_window=1000, usage_ratio=0.01,
+    )
+    path.write_bytes(b" " * (store.MAX_HANDOFF_BYTES + 1))
+    with pytest.raises(ValueError, match="size"):
+        store.load(path.stem.removeprefix("handoff-"))
+
+
+def test_handoff_load_rejects_symlink_file(tmp_path):
+    store = HandoffStore(tmp_path / "nclaw")
+    path = store.create(
+        goal="task", model="llama3.2", estimated_tokens=10,
+        context_window=1000, usage_ratio=0.01,
+    )
+    outside = tmp_path / "outside.json"
+    outside.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    path.unlink()
+    path.symlink_to(outside)
+    with pytest.raises(ValueError, match="unavailable or unsafe"):
+        store.load(path.stem.removeprefix("handoff-"))
