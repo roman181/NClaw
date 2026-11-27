@@ -412,6 +412,8 @@ class ApprovalManager:
 
     def list_executions(self, limit: int = 50) -> list[dict[str, Any]]:
         """Return recent executions with a read-only process-liveness diagnosis."""
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 200:
+            raise ValueError("limit must be between 1 and 200")
         with self._lock:
             if self.db_path is None:
                 records = sorted(
