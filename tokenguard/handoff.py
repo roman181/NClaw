@@ -149,6 +149,6 @@ class HandoffStore:
             payload = json.loads(
                 raw.decode("utf-8"), object_pairs_hook=self._reject_duplicate_keys
             )
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
             raise ValueError("Malformed handoff JSON") from exc
         return self._validate(payload, normalized_id)
