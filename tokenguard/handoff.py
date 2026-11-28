@@ -108,7 +108,9 @@ class HandoffStore:
         ):
             raise ValueError("Invalid handoff usage ratio")
         try:
-            datetime.fromisoformat(payload["created_at"])
+            timestamp = datetime.fromisoformat(payload["created_at"])
+            if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+                raise ValueError("Handoff timestamp must include a timezone")
         except (TypeError, ValueError):
             raise ValueError("Invalid handoff timestamp") from None
         notes = payload["notes"]
@@ -119,7 +121,7 @@ class HandoffStore:
         return payload
 
     def load(self, handoff_id: str) -> dict[str, Any]:
-        """Validate and return a handoff by UUID hex; never resumes it."""
+        """Validate and return a handoff by UUID hex; never resumes execution."""
         try:
             normalized_id = uuid.UUID(hex=handoff_id).hex
         except (ValueError, TypeError, AttributeError):
